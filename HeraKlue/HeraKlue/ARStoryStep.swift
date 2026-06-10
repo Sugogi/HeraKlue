@@ -13,6 +13,15 @@ enum ARModelType: Equatable {
     case puzzleSet
 }
 
+enum OnboardingScreen: Equatable {
+    case headsetButtonSpeakers   // Figma 501:7
+    case headsetCamera           // Figma 501:8
+    case loading                 // Figma 213:12
+    case pressToContinue         // Figma 213:21
+    case waitingForParent        // Figma 213:36
+    case journeyArranged         // Figma 213:49
+}
+
 struct ARStoryStep: Identifiable, Equatable {
     let id: String
     let title: String
@@ -22,6 +31,7 @@ struct ARStoryStep: Identifiable, Equatable {
     let model: ARModelType
     let showsCrosshair: Bool
     let repeatLine: String?
+    var onboarding: OnboardingScreen? = nil   // if set, show the Figma 2D screen instead of AR + dialogs
 
     static let steps: [ARStoryStep] = [
 
@@ -33,9 +43,10 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "Press the headset button to select, continue, or interact. Hold the button to notify your parent. The speakers provide audio guides and enhance the AR experience.",
             missionText: nil,
             promptText: "Tap to continue",
-            model: .headsetDiagramOne,
+            model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .headsetButtonSpeakers
         ),
 
         ARStoryStep(
@@ -44,9 +55,10 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "The camera identifies what you are looking at so HeraKlue can project relevant images. Do not block the camera.",
             missionText: nil,
             promptText: "Tap to continue",
-            model: .headsetDiagramTwo,
+            model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .headsetCamera
         ),
 
         // MARK: Loading Screens
@@ -59,7 +71,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Loading...",
             model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .loading
         ),
 
         ARStoryStep(
@@ -70,7 +83,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Tap to continue",
             model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .pressToContinue
         ),
 
         // MARK: Parent Consent
@@ -83,7 +97,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Waiting for parent approval",
             model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .waitingForParent
         ),
 
         ARStoryStep(
@@ -94,7 +109,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Tap to continue",
             model: .none,
             showsCrosshair: false,
-            repeatLine: nil
+            repeatLine: nil,
+            onboarding: .journeyArranged
         ),
 
         // MARK: Welcome Screens with Ariadne
