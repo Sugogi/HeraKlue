@@ -25,7 +25,7 @@ struct LoadingView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.white.opacity(0.48).ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Image("HeraklueLogo")

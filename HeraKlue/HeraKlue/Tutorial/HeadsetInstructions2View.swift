@@ -15,7 +15,7 @@ struct HeadsetInstructions2View: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.white.opacity(0.5).ignoresSafeArea()
 
             // Purple card holding the headset photo, with the camera callout.
             ZStack {

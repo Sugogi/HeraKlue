@@ -13,7 +13,7 @@ struct WaitingForParentView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.white.opacity(0.62).ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Text("HeraKlue needs your parent’s approval before the myth hunt begins.")

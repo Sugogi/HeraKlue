@@ -14,7 +14,7 @@ struct PressToContinueView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.white.opacity(0.48).ignoresSafeArea()
 
             VStack(spacing: 24) {
                 Image("HeraklueLogo")

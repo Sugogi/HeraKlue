@@ -18,20 +18,27 @@ struct TutorialFlowView: View {
 
     var body: some View {
         ZStack {
-            switch step {
-            case 0: HeadsetInstructions1View(onContinue: next)
-            case 1: HeadsetInstructions2View(onContinue: next)
-            case 2: LoadingView(onContinue: next)
-            case 3: PressToContinueView(onContinue: next)    // 213:21 — press to continue
-            case 4: WaitingForParentView(onContinue: next)   // 213:36 — waiting on parent app
-            case 5: JourneyArrangedView(onContinue: next)    // 213:49 — journey arranged
-            case 6: WelcomeView(onContinue: next)            // Ariadne's welcome
-            default:
-                // Tutorial finished -> start the AR adventure (Stephen's section).
-                Color.clear.onAppear { flow.go(to: .gameplay) }
+            // AR camera passthrough behind the whole tutorial.
+            // (Live camera on a real device; black in the Simulator.)
+            CameraView()
+                .ignoresSafeArea()
+
+            ZStack {
+                switch step {
+                case 0: HeadsetInstructions1View(onContinue: next)
+                case 1: HeadsetInstructions2View(onContinue: next)
+                case 2: LoadingView(onContinue: next)
+                case 3: PressToContinueView(onContinue: next)    // 213:21 — press to continue
+                case 4: WaitingForParentView(onContinue: next)   // 213:36 — waiting on parent app
+                case 5: JourneyArrangedView(onContinue: next)    // 213:49 — journey arranged
+                case 6: WelcomeView(onContinue: next)            // Ariadne's welcome (awaiting content)
+                default:
+                    // Tutorial finished -> start the AR adventure (Stephen's section).
+                    Color.clear.onAppear { flow.go(to: .gameplay) }
+                }
             }
+            .animation(.easeInOut, value: step)
         }
-        .animation(.easeInOut, value: step)
     }
 
     private func next() {

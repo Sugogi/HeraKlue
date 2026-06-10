@@ -13,7 +13,7 @@ struct JourneyArrangedView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.white.opacity(0.62).ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Text("Your Journey has been arranged!")
