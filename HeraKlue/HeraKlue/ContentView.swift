@@ -8,6 +8,11 @@ struct ContentView: View {
 
     private let speechSynthesizer = AVSpeechSynthesizer()
 
+    // Figma palette — Stephen's structure, the Figma look.
+    private let ink = Color(red: 74 / 255, green: 85 / 255, blue: 101 / 255)         // #4A5565
+    private let card = Color.white.opacity(0.9)
+    private let accentBlue = Color(red: 110 / 255, green: 188 / 255, blue: 239 / 255) // #6EBCEF
+
     var currentStep: ARStoryStep {
         ARStoryStep.steps[currentIndex]
     }
@@ -46,43 +51,51 @@ struct ContentView: View {
     }
 
     private var topMissionView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             if let mission = currentStep.missionText {
-                Text("Mission")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
+                Text("MISSION")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(ink.opacity(0.6))
 
                 Text(mission)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(ink)
                     .multilineTextAlignment(.center)
             }
         }
-        .padding()
-        .background(.black.opacity(currentStep.missionText == nil ? 0 : 0.65))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .background(card)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+        .opacity(currentStep.missionText == nil ? 0 : 1)
     }
 
     private var bottomStoryView: some View {
         VStack(spacing: 12) {
             Text(currentStep.title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(ink)
+                .multilineTextAlignment(.center)
 
             Text(currentStep.bodyText)
-                .font(.body)
-                .foregroundColor(.white)
+                .font(.system(size: 18, design: .rounded))
+                .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
             Text(currentStep.promptText)
-                .font(.headline)
-                .foregroundColor(.yellow)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(accentBlue, in: Capsule())
                 .padding(.top, 4)
         }
-        .padding()
-        .background(.black.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(card)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
     }
 
     private func goToNextScene() {
