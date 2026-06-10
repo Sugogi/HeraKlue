@@ -15,15 +15,9 @@ struct GameplayFlowView: View {
     @Environment(GameFlow.self) private var flow
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ContentView()                 // the RealityKit AR scene
-                .ignoresSafeArea()
-
-            Button("Skip to map (placeholder)") {
-                flow.go(to: .journeyMap)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.bottom, 40)
-        }
+        // Scaffold: Ariadne gives her AR tutorial, then we head to the map.
+        // Stephen's section — Poseidon, the journey, and the puzzles build
+        // from here. (Stephen's original demo scene is still in ContentView.)
+        AriadneARView(onContinue: { flow.go(to: .journeyMap) })
     }
 }
