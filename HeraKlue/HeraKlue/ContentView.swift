@@ -25,18 +25,23 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
-            if currentStep.showsCrosshair {
-                CrosshairView()
+            if let onboarding = currentStep.onboarding {
+                // Early steps show the Figma 2D screens over the camera.
+                OnboardingScreenView(screen: onboarding)
+            } else {
+                if currentStep.showsCrosshair {
+                    CrosshairView()
+                }
+
+                VStack {
+                    topMissionView
+
+                    Spacer()
+
+                    bottomStoryView
+                }
+                .padding()
             }
-
-            VStack {
-                topMissionView
-
-                Spacer()
-
-                bottomStoryView
-            }
-            .padding()
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -132,18 +137,14 @@ struct ContentView: View {
 struct CrosshairView: View {
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.white)
-                .frame(width: 30, height: 2)
-
-            Rectangle()
-                .fill(.white)
-                .frame(width: 2, height: 30)
+            Circle()
+                .stroke(.white.opacity(0.9), lineWidth: 3)
+                .frame(width: 44, height: 44)
 
             Circle()
-                .stroke(.white, lineWidth: 2)
-                .frame(width: 42, height: 42)
+                .fill(Color(red: 110 / 255, green: 188 / 255, blue: 239 / 255)) // #6EBCEF
+                .frame(width: 8, height: 8)
         }
-        .opacity(0.9)
+        .shadow(color: .black.opacity(0.35), radius: 4)
     }
 }
