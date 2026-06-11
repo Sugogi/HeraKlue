@@ -57,7 +57,7 @@ private struct CalloutLabel: View {
 private struct HeadsetButtonSpeakersScreen: View {
     var body: some View {
         ZStack {
-            Color.white.opacity(0.5).ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x7340C4, opacity: 0.55))
@@ -77,7 +77,7 @@ private struct HeadsetButtonSpeakersScreen: View {
 private struct HeadsetCameraScreen: View {
     var body: some View {
         ZStack {
-            Color.white.opacity(0.5).ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x753EB4, opacity: 0.55))
@@ -109,7 +109,7 @@ private struct LoadingOnboarding: View {
 
     var body: some View {
         ZStack {
-            Color.white.opacity(0.48).ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
@@ -138,7 +138,7 @@ private struct LoadingOnboarding: View {
 private struct PressToContinueOnboarding: View {
     var body: some View {
         ZStack {
-            Color.white.opacity(0.48).ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             VStack(spacing: 24) {
                 Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
@@ -169,7 +169,7 @@ private struct StatusOnboarding: View {
 
     var body: some View {
         ZStack {
-            Color.white.opacity(0.62).ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Text(message)
