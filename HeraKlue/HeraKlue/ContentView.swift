@@ -1,13 +1,22 @@
 import AVFoundation
 import SwiftUI
 
+// Steps that auto-advance when their audio finishes (if the user hasn't tapped first).
+private let autoAdvanceStepIDs: Set<String> = [
+    "welcome_1_1", "welcome_1_2", "welcome_1_3",
+    "welcome_1_4", "welcome_1_5", "welcome_1_7",
+    "poseidon_speaks_1_1", "poseidon_speaks_2_1",
+    "poseidon_speaks_2_2", "poseidon_speaks_2_3"
+]
+
 struct ContentView: View {
     @State private var currentIndex = 0
     @State private var resetAR = false
     @State private var focusedTarget: ARFocusTarget = .none
     @State private var focusedTargetDistance: Float? = nil
     @State private var lastSpokenStepID: String? = nil
-    @State private var speech = SpeechController()
+    @State private var audio = AudioController()
+    @State private var pendingAdvance: Task<Void, Never>? = nil
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -64,7 +73,12 @@ struct ContentView: View {
             repeatCurrentLine()
         }
         .task(id: currentStep.id) {
-            speakCurrentLineIfVisible()
+            if isDialogueStep {
+                speakCurrentLineIfVisible()
+            } else {
+                // Non-dialogue steps play audio immediately on appear.
+                audio.play(stepID: currentStep.id)
+            }
         }
         .onChange(of: focusedTarget) { _ in
             advanceFromAriadneToPoseidonIfReady()
@@ -92,14 +106,10 @@ struct ContentView: View {
 
     private var canInteractWithCurrentStep: Bool {
         if isPoseidonHandoffStep {
-            // The Ariadne-to-Poseidon handoff should not require a button tap.
-            // The player advances by physically walking to Poseidon and aiming at him.
             return false
         }
 
         guard currentStep.textFocusTarget != nil else {
-            // Mission prompts and non dialogue steps are never locked behind
-            // the crosshair. Only speaker dialogue requires aiming at the speaker.
             return true
         }
 
@@ -278,18 +288,16 @@ struct ContentView: View {
 
     private func speakerName(for target: ARFocusTarget?) -> String {
         switch target {
-        case .some(.ariadne):
-            return "Ariadne"
-        case .some(.poseidon):
-            return "Poseidon"
-        case .some(.puzzlePiece):
-            return "the puzzle piece"
-        case .some(.none), .none:
-            return "the speaker"
+        case .some(.ariadne):   return "Ariadne"
+        case .some(.poseidon):  return "Poseidon"
+        case .some(.puzzlePiece): return "the puzzle piece"
+        case .some(.none), .none: return "the speaker"
         }
     }
 
     private func goToNextScene() {
+        pendingAdvance?.cancel()
+        pendingAdvance = nil
         if currentIndex < ARStoryStep.steps.count - 1 {
             currentIndex += 1
         } else {
@@ -306,29 +314,58 @@ struct ContentView: View {
     private func speakCurrentLineIfVisible() {
         guard isDialogueStep, shouldShowDialogueCard else { return }
         guard lastSpokenStepID != currentStep.id else { return }
-
-        speech.speak(currentStep.bodyText)
         lastSpokenStepID = currentStep.id
+
+        guard let duration = audio.play(stepID: currentStep.id) else { return }
+
+        guard autoAdvanceStepIDs.contains(currentStep.id) else { return }
+        pendingAdvance?.cancel()
+        pendingAdvance = Task {
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled else { return }
+            goToNextScene()
+        }
     }
 
     private func repeatCurrentLine() {
         guard isDialogueStep, shouldShowDialogueCard else { return }
-        speech.speak(currentStep.repeatLine ?? currentStep.bodyText)
+        audio.play(stepID: currentStep.id)
     }
 }
 
-private final class SpeechController {
-    private let synthesizer = AVSpeechSynthesizer()
+private final class AudioController {
+    private var player: AVAudioPlayer?
 
-    func speak(_ text: String) {
-        synthesizer.stopSpeaking(at: .immediate)
+    private let stepAudioMap: [String: String] = [
+        "parental_consent_1_2": "1 your journey has been arranged",
+        "welcome_1_1":          "2 Welcome!",
+        "welcome_1_2":          "3 Minotaur vanished",
+        "welcome_1_3":          "4 As gods",
+        "welcome_1_4":          "5 25 puzzle pieces",
+        "welcome_1_5":          "6 secret location",
+        "welcome_1_7":          "7 good luck adventurer",
+        "poseidon_speaks_1_1":  "yoohoo!",
+        "poseidon_speaks_2_1":  "9 Whatsup! im poseidon",
+        "poseidon_speaks_2_2":  "10 i cant say much but",
+        "poseidon_speaks_2_3":  "11 you have to find",
+        "mission_accepted_1_1": "12 The FOUR.STONE.LIONS",
+        "journey_1_5":          "13 pssst..over here",
+        "journey_1_4":          "hey, follow me!",
+        "puzzle_1_2":           "0 press the button to interact",
+    ]
 
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = 0.48
-        utterance.pitchMultiplier = 1.0
-        utterance.volume = 1.0
-
-        synthesizer.speak(utterance)
+    /// Plays the mp3 for this step. Returns the audio duration if a file was found, nil otherwise.
+    @discardableResult
+    func play(stepID: String) -> TimeInterval? {
+        guard let filename = stepAudioMap[stepID],
+              let url = Bundle.main.url(forResource: filename, withExtension: "mp3"),
+              let newPlayer = try? AVAudioPlayer(contentsOf: url) else {
+            return nil
+        }
+        player?.stop()
+        player = newPlayer
+        player?.play()
+        return newPlayer.duration
     }
 }
 

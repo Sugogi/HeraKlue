@@ -220,17 +220,6 @@ struct ARStoryStep: Identifiable, Equatable {
             textFocusTarget: .poseidon
         ),
 
-        ARStoryStep(
-            id: "poseidon_speaks_1_3",
-            title: "Poseidon",
-            bodyText: "I am Poseidon. I have a mission for you.",
-            missionText: "Talk to Poseidon",
-            promptText: "Press the button to accept Poseidon’s mission",
-            model: .poseidonClose,
-            showsCrosshair: true,
-            repeatLine: "I am Poseidon. I have a mission for you.",
-            textFocusTarget: .poseidon
-        ),
 
         ARStoryStep(
             id: "poseidon_speaks_2_1",
