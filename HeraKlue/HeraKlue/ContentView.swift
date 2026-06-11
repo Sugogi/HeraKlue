@@ -100,6 +100,7 @@ struct ContentView: View {
             speakCurrentLineIfVisible()
         }
         .onAppear {
+            airPods.reactivateSession()
             airPods.onSingleTap = {
                 guard currentStep.allowsTap, canInteractWithCurrentStep else { return }
                 goToNextScene()
@@ -415,8 +416,27 @@ final class AirPodsController {
     var onSingleTap: (() -> Void)?
     var onDoubleTap: (() -> Void)?
 
+    func reactivateSession() {
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+        )
+        try? AVAudioSession.sharedInstance().setActive(true)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: "HeraKlue",
+            MPNowPlayingInfoPropertyPlaybackRate: 1.0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: 0.0,
+            MPMediaItemPropertyPlaybackDuration: 9999.0
+        ]
+    }
+
     init() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+        )
         try? AVAudioSession.sharedInstance().setActive(true)
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
