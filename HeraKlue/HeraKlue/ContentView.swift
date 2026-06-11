@@ -19,11 +19,11 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            ARViewContainer(
-                currentStep: currentStep,
-                resetAR: $resetAR
-            )
-            .ignoresSafeArea()
+            // TEST-MIX: show the physically-placed Poseidon (CombinedARView)
+            // behind the story UI. Not story-synced yet — swap back to
+            // ARViewContainer(currentStep:resetAR:) to restore per-step models.
+            CombinedARView()
+                .ignoresSafeArea()
 
             if let onboarding = currentStep.onboarding {
                 // Early steps show the Figma 2D screens over the camera.
@@ -45,7 +45,14 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            goToNextScene()
+            if currentStep.allowsTap { goToNextScene() }
+        }
+        .task(id: currentStep.id) {
+            // Timed auto-advance for steps that opt in (waiting screen,
+            // Ariadne's welcome sequence). Restarts whenever the step changes.
+            guard let delay = currentStep.autoAdvance else { return }
+            try? await Task.sleep(for: .seconds(delay))
+            if !Task.isCancelled { goToNextScene() }
         }
         .onLongPressGesture(minimumDuration: 1.0) {
             repeatCurrentLine()
@@ -88,13 +95,10 @@ struct ContentView: View {
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
-            Text(currentStep.promptText)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(accentBlue, in: Capsule())
-                .padding(.top, 4)
+            if currentStep.autoAdvance == nil {
+                ButtonHint(text: currentStep.promptText)
+                    .padding(.top, 4)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity)

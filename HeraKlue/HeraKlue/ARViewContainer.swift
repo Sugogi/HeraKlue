@@ -210,23 +210,90 @@ struct ARViewContainer: UIViewRepresentable {
         }
 
         private func createPoseidon(isFar: Bool) -> Entity {
+            guard let url = Bundle.main.url(
+                forResource: "Poseidon",
+                withExtension: "usdz"
+            ) else {
+                print("❌ Could not find Poseidon.usdz in app bundle.")
+                return createPoseidonPlaceholder(isFar: isFar)
+            }
+
+            do {
+                let poseidon = try Entity.load(contentsOf: url)
+
+                diagnoseModelDepth(entity: poseidon, name: "Poseidon.usdz")
+
+                poseidon.scale = isFar
+                    ? SIMD3<Float>(0.03, 0.03, 0.03)
+                    : SIMD3<Float>(0.045, 0.045, 0.045)
+
+                poseidon.position = isFar
+                    ? SIMD3<Float>(0, -0.15, -0.5)
+                    : SIMD3<Float>(0, -0.2, 0)
+
+                poseidon.generateCollisionShapes(recursive: true)
+
+                print("✅ Poseidon.usdz loaded successfully.")
+                return poseidon
+            } catch {
+                print("❌ Failed to load Poseidon.usdz: \(error)")
+                return createPoseidonPlaceholder(isFar: isFar)
+            }
+        }
+        
+        private func diagnoseModelDepth(entity: Entity, name: String) {
+            let bounds = entity.visualBounds(relativeTo: nil)
+            let size = bounds.extents
+
+            print("----- \(name) MODEL DIAGNOSTIC -----")
+            print("Width X: \(size.x)")
+            print("Height Y: \(size.y)")
+            print("Depth Z: \(size.z)")
+
+            if size.z < 0.01 {
+                print("⚠️ \(name) appears very flat. It may be a 2D plane/card instead of a full 3D model.")
+            } else {
+                print("✅ \(name) has visible depth and should be a real 3D model.")
+            }
+
+            print("-----------------------------------")
+        }
+        private func createPoseidonPlaceholder(isFar: Bool) -> Entity {
             let group = Entity()
 
             let body = ModelEntity(
                 mesh: .generateBox(width: 0.18, height: 0.42, depth: 0.12),
-                materials: [SimpleMaterial(color: .systemBlue, roughness: 0.35, isMetallic: false)]
+                materials: [
+                    SimpleMaterial(
+                        color: .systemBlue,
+                        roughness: 0.35,
+                        isMetallic: false
+                    )
+                ]
             )
             body.position = SIMD3<Float>(0, 0, 0)
 
             let head = ModelEntity(
                 mesh: .generateSphere(radius: 0.1),
-                materials: [SimpleMaterial(color: .cyan, roughness: 0.35, isMetallic: false)]
+                materials: [
+                    SimpleMaterial(
+                        color: .cyan,
+                        roughness: 0.35,
+                        isMetallic: false
+                    )
+                ]
             )
             head.position = SIMD3<Float>(0, 0.32, 0)
 
             let exclamation = ModelEntity(
                 mesh: .generateSphere(radius: 0.045),
-                materials: [SimpleMaterial(color: .systemYellow, roughness: 0.2, isMetallic: false)]
+                materials: [
+                    SimpleMaterial(
+                        color: .systemYellow,
+                        roughness: 0.2,
+                        isMetallic: false
+                    )
+                ]
             )
             exclamation.position = SIMD3<Float>(0, 0.58, 0)
 
@@ -244,7 +311,6 @@ struct ARViewContainer: UIViewRepresentable {
 
             return group
         }
-
         private func createAriadne() -> Entity {
             let group = Entity()
 
