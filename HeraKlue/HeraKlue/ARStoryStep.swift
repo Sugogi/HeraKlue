@@ -31,18 +31,9 @@ struct ARStoryStep: Identifiable, Equatable {
     let repeatLine: String?
     var onboarding: OnboardingScreen? = nil   // if set, show the Figma 2D screen instead of AR + dialogs
 
-    // Auto-advance / tap rules (to reduce tapping; keyed by step id).
-    /// If set, the step advances on its own after this many seconds.
-    var autoAdvance: TimeInterval? {
-        if id == "parental_consent_1_1" { return 5 }                     // waiting for parent
-        if id.hasPrefix("welcome_") && id != "welcome_1_7" { return 5 }  // Ariadne's timed sequence
-        return nil
-    }
-
-    /// If false, pressing the button / tapping does not advance this step.
-    var allowsTap: Bool {
-        id != "parental_consent_1_1"   // the parent-approval wait can't be skipped
-    }
+    /// Every story step now advances only by user tap.
+    /// This keeps the app from changing scenes automatically while the user is looking around in AR.
+    var allowsTap: Bool { true }
 
     static let steps: [ARStoryStep] = [
 
@@ -357,7 +348,7 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Help Accepted",
             bodyText: "Find Ariadne. She will guide you.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Press the button to find Ariadne",
+            promptText: "Scan the marker to reveal Ariadne",
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Find Ariadne. She will guide you."
@@ -368,7 +359,7 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Follow Ariadne",
             bodyText: "Ariadne guides you through audio. Follow her voice.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Press the button to continue following",
+            promptText: "Scan the marker to keep following Ariadne",
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Follow my voice. I will guide you."
@@ -379,7 +370,7 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Ariadne Appears",
             bodyText: "Psst... over here!",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Press the button to follow Ariadne",
+            promptText: "Scan the marker to follow Ariadne",
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Psst... over here!"
@@ -392,7 +383,7 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Puzzle Piece Nearby",
             bodyText: "Following Ariadne, a floating puzzle piece appears in your view.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Center the crosshair on the puzzle piece",
+            promptText: "Scan the marker to reveal the puzzle piece",
             model: .puzzlePiece,
             showsCrosshair: true,
             repeatLine: "Center the crosshair on the puzzle piece."
@@ -403,7 +394,7 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Interact",
             bodyText: "Center your crosshair on the puzzle piece, then press the headset button to interact.",
             missionText: "Collect the puzzle piece",
-            promptText: "Press the button to interact",
+            promptText: "Press the button to collect the scanned puzzle piece",
             model: .puzzlePiece,
             showsCrosshair: true,
             repeatLine: "Center your crosshair on the puzzle piece, then press the button to interact."
