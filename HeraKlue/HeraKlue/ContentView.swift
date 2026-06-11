@@ -19,7 +19,7 @@ struct ContentView: View {
     @State private var audio = AudioController()
     @State private var pendingAdvance: Task<Void, Never>? = nil
     @State private var hintAvailable = true
-    @State private var airPods = AirPodsController()
+    let airPods: AirPodsController
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -411,12 +411,12 @@ private final class AudioController {
     }
 }
 
-private final class AirPodsController {
+final class AirPodsController {
     var onSingleTap: (() -> Void)?
     var onDoubleTap: (() -> Void)?
 
     init() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: .mixWithOthers)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
         try? AVAudioSession.sharedInstance().setActive(true)
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
