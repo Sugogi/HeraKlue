@@ -12,7 +12,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        let window = UIWindow(frame: UIScreen.main.bounds)
+        let window = UIWindow(windowScene: application.connectedScenes.first as! UIWindowScene)
         let contentView = ContentView(airPods: airPods)
         window.rootViewController = UIHostingController(rootView: contentView)
         window.makeKeyAndVisible()

@@ -430,12 +430,14 @@ final class AirPodsController {
 
         center.togglePlayPauseCommand.isEnabled = true
         center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            print("🎧 AirPods: single tap fired")
             DispatchQueue.main.async { self?.onSingleTap?() }
             return .success
         }
 
         center.nextTrackCommand.isEnabled = true
         center.nextTrackCommand.addTarget { [weak self] _ in
+            print("🎧 AirPods: double tap fired")
             DispatchQueue.main.async { self?.onDoubleTap?() }
             return .success
         }
