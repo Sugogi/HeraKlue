@@ -20,8 +20,7 @@ struct OnboardingScreenView: View {
 
     var body: some View {
         switch screen {
-        case .headsetButtonSpeakers: HeadsetButtonSpeakersScreen()
-        case .headsetCamera:         HeadsetCameraScreen()
+        case .headsetButtonPopup:    HeadsetButtonPopupScreen()
         case .loading:               LoadingOnboarding()
         case .pressToContinue:       PressToContinueOnboarding()
         case .waitingForParent:
@@ -77,6 +76,41 @@ private struct CalloutLabel: View {
 }
 
 // MARK: - Headset screens (501:7, 501:8)
+
+private struct HeadsetButtonPopupScreen: View {
+    var body: some View {
+        ZStack {
+            Color.clear.ignoresSafeArea()
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(hex: 0x7340C4, opacity: 0.55))
+
+                Image("HeadsetButtonSpeakers")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(18)
+            }
+            .frame(width: 330, height: 300)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+            Text("The button is on the side of your headset!\nReach up and press it to continue!")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color(hex: 0x4A5565))
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.vertical, 18)
+                .padding(.horizontal, 22)
+                .background(Color.white.opacity(cardOpacity), in: RoundedRectangle(cornerRadius: 22))
+                .shadow(color: .black.opacity(0.22), radius: 12, y: 5)
+                .frame(maxWidth: 390)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 34)
+        }
+    }
+}
+
 
 private struct HeadsetButtonSpeakersScreen: View {
     var body: some View {

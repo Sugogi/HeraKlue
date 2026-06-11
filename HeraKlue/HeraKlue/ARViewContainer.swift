@@ -8,6 +8,7 @@ struct ARViewContainer: UIViewRepresentable {
     let currentStep: ARStoryStep
     @Binding var resetAR: Bool
     @Binding var focusedTarget: ARFocusTarget
+    @Binding var focusedTargetDistance: Float?
 
     private enum MissionMarker {
         static let resourceName = "ar_marker"
@@ -43,7 +44,7 @@ struct ARViewContainer: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(focusedTarget: $focusedTarget)
+        Coordinator(focusedTarget: $focusedTarget, focusedTargetDistance: $focusedTargetDistance)
     }
 
     @discardableResult
@@ -121,6 +122,7 @@ struct ARViewContainer: UIViewRepresentable {
         var hasMissionMarker = false
 
         private var focusedTarget: Binding<ARFocusTarget>
+        private var focusedTargetDistance: Binding<Float?>
         private var displayLink: CADisplayLink?
         private var currentStep: ARStoryStep?
         private var lastStepID: String?
@@ -130,8 +132,9 @@ struct ARViewContainer: UIViewRepresentable {
         private var persistentAriadneAnchor: AnchorEntity?
         private var missionMarkerTransform: simd_float4x4?
 
-        init(focusedTarget: Binding<ARFocusTarget>) {
+        init(focusedTarget: Binding<ARFocusTarget>, focusedTargetDistance: Binding<Float?>) {
             self.focusedTarget = focusedTarget
+            self.focusedTargetDistance = focusedTargetDistance
             super.init()
         }
 
@@ -152,12 +155,33 @@ struct ARViewContainer: UIViewRepresentable {
             guard let arView, !arView.bounds.isEmpty else { return }
 
             let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
-            let target = arView.hitTest(center)
-                .compactMap { focusTarget(for: $0.entity) }
-                .first ?? .none
+            let focusedHit = arView.hitTest(center)
+                .compactMap { result -> (target: ARFocusTarget, distance: Float)? in
+                    guard let target = focusTarget(for: result.entity) else { return nil }
+                    return (target, result.distance)
+                }
+                .first
+
+            let target = focusedHit?.target ?? .none
+            let distance = focusedHit?.distance
 
             if focusedTarget.wrappedValue != target {
                 focusedTarget.wrappedValue = target
+            }
+
+            if shouldUpdateFocusedDistance(to: distance) {
+                focusedTargetDistance.wrappedValue = distance
+            }
+        }
+
+        private func shouldUpdateFocusedDistance(to newDistance: Float?) -> Bool {
+            switch (focusedTargetDistance.wrappedValue, newDistance) {
+            case (nil, nil):
+                return false
+            case (nil, .some), (.some, nil):
+                return true
+            case let (.some(oldDistance), .some(newDistance)):
+                return abs(oldDistance - newDistance) > 0.05
             }
         }
 
@@ -212,6 +236,7 @@ struct ARViewContainer: UIViewRepresentable {
             persistentAriadneAnchor = nil
             missionMarkerTransform = nil
             focusedTarget.wrappedValue = .none
+            focusedTargetDistance.wrappedValue = nil
         }
 
         func showScene(for step: ARStoryStep, forceRefresh: Bool = false) {
@@ -222,12 +247,21 @@ struct ARViewContainer: UIViewRepresentable {
 
             lastStepID = step.id
 
+            if shouldKeepPoseidonVisible(for: step) {
+                // Poseidon is part of the world from the Ariadne tutorial onward.
+                // Spawn him once beside Ariadne and keep the same anchor for the
+                // rest of the prototype so he never disappears between story steps.
+                ensurePoseidonExists(for: .poseidonFar, in: arView)
+            }
+
             if isPoseidon(step.model) {
-                // Poseidon is persistent. Once he appears, he is never removed
-                // during normal scene changes. This lets the user keep walking
-                // toward the same anchored Poseidon while tapping through scenes.
-                ensurePoseidonExists(for: step.model, in: arView)
-                removeTransientAnchor()
+                // Poseidon is persistent. During the Poseidon dialogue, keep the
+                // intro Ariadne anchor visible so she does not disappear just
+                // because the player walked over to Poseidon. Once the mission
+                // is accepted, remove that intro Ariadne anchor.
+                if isMissionStarted(step) {
+                    removeTransientAnchor()
+                }
                 return
             }
 
@@ -297,12 +331,13 @@ struct ARViewContainer: UIViewRepresentable {
                 return
             }
 
-            if step.model == .ariadne {
-                // Ariadne should stay in the world after she gives the hints.
-                // Keep her on a separate persistent anchor so later puzzle-piece
-                // scenes do not remove her.
+            if step.model == .ariadne || step.model == .puzzlePiece {
+                // Ariadne and the puzzle piece are now a paired marker scene.
+                // Once the mission marker is scanned, Ariadne spawns 1 meter
+                // away from the marker and the puzzle piece appears above her
+                // at the same time. They stay persistent after the hints.
                 removeTransientAnchor()
-                ensureAriadneExistsAtMissionMarker(in: arView)
+                ensureAriadneAndPuzzlePieceExistAtMissionMarker(in: arView)
                 return
             }
 
@@ -332,12 +367,15 @@ struct ARViewContainer: UIViewRepresentable {
             persistentPoseidonAnchor = anchor
         }
 
-        private func ensureAriadneExistsAtMissionMarker(in arView: ARView) {
+        private func ensureAriadneAndPuzzlePieceExistAtMissionMarker(in arView: ARView) {
             guard persistentAriadneAnchor == nil else { return }
 
-            let entity = makeMarkerGatedEntity(for: .ariadne)
+            let entity = makeAriadneWithPuzzlePieceAbove()
             let anchor = AnchorEntity(
-                world: markerGroundedTransformFacingCamera(arView: arView)
+                world: markerGroundedTransformFacingCamera(
+                    arView: arView,
+                    distanceFromMarker: 1.0
+                )
             )
             anchor.addChild(entity)
             arView.scene.addAnchor(anchor)
@@ -357,6 +395,14 @@ struct ARViewContainer: UIViewRepresentable {
             default:
                 return false
             }
+        }
+
+        private func shouldKeepPoseidonVisible(for step: ARStoryStep) -> Bool {
+            // Poseidon should first appear as soon as the Ariadne tutorial begins,
+            // then stay in the AR world for every step after that.
+            step.id.hasPrefix("welcome_")
+                || step.id.hasPrefix("poseidon_")
+                || isMissionStarted(step)
         }
 
         private func isMissionStarted(_ step: ARStoryStep) -> Bool {
@@ -402,12 +448,14 @@ struct ARViewContainer: UIViewRepresentable {
 
         private func makeAnchor(for model: ARModelType, arView: ARView) -> AnchorEntity {
             let distance = spawnDistance(for: model)
+            let lateralOffset = spawnLateralOffset(for: model)
 
             if usesGroundAnchor(for: model) {
                 return AnchorEntity(
                     world: groundedTransformInFrontOfCamera(
                         arView: arView,
-                        distance: distance
+                        distance: distance,
+                        lateralOffset: lateralOffset
                     )
                 )
             }
@@ -443,6 +491,18 @@ struct ARViewContainer: UIViewRepresentable {
             }
         }
 
+        private func spawnLateralOffset(for model: ARModelType) -> Float {
+            switch model {
+            case .poseidonFar, .poseidonClose:
+                // Keep Poseidon visible during Ariadne's tutorial without placing
+                // him directly behind Ariadne's hitbox. Positive values place him
+                // to the user's right at initial spawn.
+                return 1.25
+            default:
+                return 0
+            }
+        }
+
         private func transformInFrontOfCamera(arView: ARView, distance: Float) -> simd_float4x4 {
             guard let cameraTransform = arView.session.currentFrame?.camera.transform else {
                 var fallback = matrix_identity_float4x4
@@ -459,7 +519,11 @@ struct ARViewContainer: UIViewRepresentable {
             return transform
         }
 
-        private func groundedTransformInFrontOfCamera(arView: ARView, distance: Float) -> simd_float4x4 {
+        private func groundedTransformInFrontOfCamera(
+            arView: ARView,
+            distance: Float,
+            lateralOffset: Float = 0
+        ) -> simd_float4x4 {
             guard let cameraTransform = arView.session.currentFrame?.camera.transform else {
                 var fallback = matrix_identity_float4x4
                 fallback.columns.3.z = distance
@@ -493,7 +557,9 @@ struct ARViewContainer: UIViewRepresentable {
                 fallback: SIMD3<Float>(0, 0, 1)
             )
 
-            var spawnPosition = cameraPosition + cameraBackward * distance
+            var spawnPosition = cameraPosition
+                + cameraBackward * distance
+                + cameraRight * lateralOffset
             spawnPosition.y = detectedGroundY(in: arView) ?? cameraPosition.y - 1.45
 
             var transform = matrix_identity_float4x4
@@ -505,7 +571,10 @@ struct ARViewContainer: UIViewRepresentable {
             return transform
         }
 
-        private func markerGroundedTransformFacingCamera(arView: ARView) -> simd_float4x4 {
+        private func markerGroundedTransformFacingCamera(
+            arView: ARView,
+            distanceFromMarker: Float = 0
+        ) -> simd_float4x4 {
             guard let markerTransform = missionMarkerTransform else {
                 return groundedTransformInFrontOfCamera(arView: arView, distance: -1.2)
             }
@@ -521,6 +590,9 @@ struct ARViewContainer: UIViewRepresentable {
                 SIMD3<Float>($0.columns.3.x, $0.columns.3.y, $0.columns.3.z)
             } ?? SIMD3<Float>(markerPosition.x, markerPosition.y, markerPosition.z + 1)
 
+            // Direction from the marker toward the player/camera. Ariadne uses
+            // this to spawn 1 meter away from the reference marker instead of
+            // directly on top of the printed image.
             let toCamera = horizontalUnitVector(
                 from: cameraPosition - markerPosition,
                 fallback: SIMD3<Float>(0, 0, 1)
@@ -534,11 +606,13 @@ struct ARViewContainer: UIViewRepresentable {
             let groundY = detectedGroundY(in: arView)
                 ?? cameraPosition.y - 1.45
 
+            let spawnPosition = markerPosition + toCamera * distanceFromMarker
+
             var transform = matrix_identity_float4x4
             transform.columns.0 = SIMD4<Float>(right.x, 0, right.z, 0)
             transform.columns.1 = SIMD4<Float>(0, 1, 0, 0)
             transform.columns.2 = SIMD4<Float>(toCamera.x, 0, toCamera.z, 0)
-            transform.columns.3 = SIMD4<Float>(markerPosition.x, groundY, markerPosition.z, 1)
+            transform.columns.3 = SIMD4<Float>(spawnPosition.x, groundY, spawnPosition.z, 1)
 
             return transform
         }
@@ -612,22 +686,36 @@ struct ARViewContainer: UIViewRepresentable {
             }
         }
 
+        private func setEntityVisualHeight(_ entity: Entity, to targetHeight: Float) {
+            let bounds = entity.visualBounds(relativeTo: entity)
+            let currentHeight = bounds.extents.y
+
+            guard currentHeight.isFinite, currentHeight > 0.001 else { return }
+
+            let scaleFactor = targetHeight / currentHeight
+            entity.scale = SIMD3<Float>(scaleFactor, scaleFactor, scaleFactor)
+        }
+
         private func makePoseidon(isFar: Bool) -> Entity {
             do {
-                let poseidon = try Entity.load(named: "Poseidon_Stylized")
-                poseidon.scale = isFar
-                    ? SIMD3<Float>(0.9, 0.9, 0.9)
-                    : SIMD3<Float>(1.0, 1.0, 1.0)
-                poseidon.position = SIMD3<Float>(0, 0, 0)
-                tagEntity(poseidon, as: .poseidon)
+                let root = Entity()
+                let poseidonModel = try Entity.load(named: "Poseidon_Stylized")
+
+                // Normalize Poseidon to a real world height of about 2 meters.
+                setEntityVisualHeight(poseidonModel, to: 2.0)
+
+                root.addChild(poseidonModel)
+                root.position = SIMD3<Float>(0, 0, 0)
+
+                tagEntity(root, as: .poseidon)
                 addFocusHitbox(
-                    to: poseidon,
+                    to: root,
                     as: .poseidon,
-                    size: SIMD3<Float>(0.9, 1.8, 0.6),
-                    centerY: 0.9
+                    size: SIMD3<Float>(1.0, 2.1, 0.75),
+                    centerY: 1.05
                 )
-                poseidon.generateCollisionShapes(recursive: true)
-                return poseidon
+                root.generateCollisionShapes(recursive: true)
+                return root
             } catch {
                 print("Could not load Poseidon_Stylized.usdz: \(error)")
                 return makePoseidonPlaceholder(isFar: isFar)
@@ -638,55 +726,82 @@ struct ARViewContainer: UIViewRepresentable {
             let group = Entity()
 
             let body = ModelEntity(
-                mesh: .generateBox(width: 0.18, height: 0.42, depth: 0.12),
+                mesh: .generateBox(width: 0.45, height: 1.25, depth: 0.28),
                 materials: [SimpleMaterial(color: .systemBlue, roughness: 0.35, isMetallic: false)]
             )
-            body.position = SIMD3<Float>(0, 0.21, 0)
+            body.position = SIMD3<Float>(0, 0.625, 0)
 
             let head = ModelEntity(
-                mesh: .generateSphere(radius: 0.1),
+                mesh: .generateSphere(radius: 0.24),
                 materials: [SimpleMaterial(color: .cyan, roughness: 0.35, isMetallic: false)]
             )
-            head.position = SIMD3<Float>(0, 0.53, 0)
+            head.position = SIMD3<Float>(0, 1.42, 0)
 
             let exclamation = ModelEntity(
-                mesh: .generateSphere(radius: 0.045),
+                mesh: .generateSphere(radius: 0.07),
                 materials: [SimpleMaterial(color: .systemYellow, roughness: 0.2, isMetallic: false)]
             )
-            exclamation.position = SIMD3<Float>(0, 0.79, 0)
+            exclamation.position = SIMD3<Float>(0, 1.88, 0)
 
             group.addChild(body)
             group.addChild(head)
             group.addChild(exclamation)
-            group.scale = isFar ? SIMD3<Float>(0.9, 0.9, 0.9) : SIMD3<Float>(1, 1, 1)
             group.position = SIMD3<Float>(0, 0, 0)
             tagEntity(group, as: .poseidon)
             addFocusHitbox(
                 to: group,
                 as: .poseidon,
-                size: SIMD3<Float>(0.55, 1.0, 0.45),
-                centerY: 0.5
+                size: SIMD3<Float>(1.0, 2.1, 0.75),
+                centerY: 1.05
             )
             group.generateCollisionShapes(recursive: true)
 
             return group
         }
 
+        private func makeAriadneWithPuzzlePieceAbove() -> Entity {
+            let group = Entity()
+
+            let ariadne = makeAriadne()
+            ariadne.position = SIMD3<Float>(0, 0, 0)
+            group.addChild(ariadne)
+
+            let puzzlePiece = makePuzzlePiece()
+            // Place the puzzle piece above Ariadne's head and keep it upright.
+            // Ariadne is normalized to 2 meters tall, so 2.45 meters puts the
+            // puzzle piece clearly above her without blocking her face.
+            puzzlePiece.position = SIMD3<Float>(0, 2.45, 0)
+            puzzlePiece.orientation = simd_quatf(
+                angle: .pi / 2,
+                axis: SIMD3<Float>(1, 0, 0)
+            )
+            group.addChild(puzzlePiece)
+
+            group.generateCollisionShapes(recursive: true)
+            return group
+        }
+
         private func makeAriadne() -> Entity {
             do {
-                let ariadne = try Entity.load(named: "Ariadne_Stylized")
-                ariadne.scale = SIMD3<Float>(0.85, 0.85, 0.85)
-                ariadne.position = SIMD3<Float>(0, 0, 0)
-                ariadne.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
-                tagEntity(ariadne, as: .ariadne)
+                let root = Entity()
+                let ariadneModel = try Entity.load(named: "Ariadne_Stylized")
+
+                // Normalize Ariadne to a real world height of about 2 meters.
+                setEntityVisualHeight(ariadneModel, to: 2.0)
+
+                root.addChild(ariadneModel)
+                root.position = SIMD3<Float>(0, 0, 0)
+                root.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
+
+                tagEntity(root, as: .ariadne)
                 addFocusHitbox(
-                    to: ariadne,
+                    to: root,
                     as: .ariadne,
-                    size: SIMD3<Float>(0.8, 1.6, 0.55),
-                    centerY: 0.8
+                    size: SIMD3<Float>(0.9, 2.1, 0.65),
+                    centerY: 1.05
                 )
-                ariadne.generateCollisionShapes(recursive: true)
-                return ariadne
+                root.generateCollisionShapes(recursive: true)
+                return root
             } catch {
                 print("Could not load Ariadne_Stylized.usdz: \(error)")
                 return makeAriadnePlaceholder()
@@ -697,33 +812,34 @@ struct ARViewContainer: UIViewRepresentable {
             let group = Entity()
 
             let body = ModelEntity(
-                mesh: .generateBox(width: 0.16, height: 0.36, depth: 0.1),
+                mesh: .generateBox(width: 0.4, height: 1.15, depth: 0.25),
                 materials: [SimpleMaterial(color: .systemPurple, roughness: 0.35, isMetallic: false)]
             )
-            body.position = SIMD3<Float>(0, 0.18, 0)
+            body.position = SIMD3<Float>(0, 0.575, 0)
 
             let head = ModelEntity(
-                mesh: .generateSphere(radius: 0.09),
+                mesh: .generateSphere(radius: 0.24),
                 materials: [SimpleMaterial(color: .magenta, roughness: 0.35, isMetallic: false)]
             )
-            head.position = SIMD3<Float>(0, 0.46, 0)
+            head.position = SIMD3<Float>(0, 1.35, 0)
 
             let guideMarker = ModelEntity(
-                mesh: .generateSphere(radius: 0.04),
+                mesh: .generateSphere(radius: 0.07),
                 materials: [SimpleMaterial(color: .systemYellow, roughness: 0.25, isMetallic: false)]
             )
-            guideMarker.position = SIMD3<Float>(0.22, 0.36, 0)
+            guideMarker.position = SIMD3<Float>(0.42, 1.15, 0)
 
             group.addChild(body)
             group.addChild(head)
             group.addChild(guideMarker)
+            group.position = SIMD3<Float>(0, 0, 0)
             group.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
             tagEntity(group, as: .ariadne)
             addFocusHitbox(
                 to: group,
                 as: .ariadne,
-                size: SIMD3<Float>(0.45, 0.9, 0.4),
-                centerY: 0.45
+                size: SIMD3<Float>(0.9, 2.1, 0.65),
+                centerY: 1.05
             )
             group.generateCollisionShapes(recursive: true)
 
