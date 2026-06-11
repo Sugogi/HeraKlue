@@ -420,7 +420,10 @@ final class AirPodsController {
         try? AVAudioSession.sharedInstance().setActive(true)
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: "HeraKlue"
+            MPMediaItemPropertyTitle: "HeraKlue",
+            MPNowPlayingInfoPropertyPlaybackRate: 1.0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: 0.0,
+            MPMediaItemPropertyPlaybackDuration: 9999.0
         ]
 
         let center = MPRemoteCommandCenter.shared()
