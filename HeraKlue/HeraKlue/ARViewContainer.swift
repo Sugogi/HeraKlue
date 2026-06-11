@@ -7,7 +7,7 @@ import simd
 struct ARViewContainer: UIViewRepresentable {
     let currentStep: ARStoryStep
     @Binding var resetAR: Bool
-    var onNearPoseidonChanged: (Bool) -> Void = { _ in }
+    @Binding var focusedTarget: ARFocusTarget
 
     private enum MissionMarker {
         static let resourceName = "ar_marker"
@@ -21,7 +21,7 @@ struct ARViewContainer: UIViewRepresentable {
 
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
-        context.coordinator.arView = arView
+        context.coordinator.startFocusTracking(in: arView)
         arView.session.delegate = context.coordinator
         context.coordinator.hasMissionMarker = runSession(on: arView, resetTracking: true)
 
@@ -29,8 +29,6 @@ struct ARViewContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ arView: ARView, context: Context) {
-        context.coordinator.onNearPoseidonChanged = onNearPoseidonChanged
-
         if resetAR {
             arView.scene.anchors.removeAll()
             context.coordinator.clearSceneCache()
@@ -45,7 +43,7 @@ struct ARViewContainer: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(focusedTarget: $focusedTarget)
     }
 
     @discardableResult
@@ -121,17 +119,89 @@ struct ARViewContainer: UIViewRepresentable {
     final class Coordinator: NSObject, ARSessionDelegate {
         weak var arView: ARView?
         var hasMissionMarker = false
-        var onNearPoseidonChanged: ((Bool) -> Void)?
-        private var isPlayerNearPoseidon = false
-        private var persistentPoseidonPosition: SIMD3<Float>?
-        private let interactionDistance: Float = 1.5   // metres
 
+        private var focusedTarget: Binding<ARFocusTarget>
+        private var displayLink: CADisplayLink?
         private var currentStep: ARStoryStep?
         private var lastStepID: String?
         private var activeTransientSceneKey: String?
         private var transientAnchor: AnchorEntity?
         private var persistentPoseidonAnchor: AnchorEntity?
+        private var persistentAriadneAnchor: AnchorEntity?
         private var missionMarkerTransform: simd_float4x4?
+
+        init(focusedTarget: Binding<ARFocusTarget>) {
+            self.focusedTarget = focusedTarget
+            super.init()
+        }
+
+        deinit {
+            displayLink?.invalidate()
+        }
+
+        func startFocusTracking(in arView: ARView) {
+            self.arView = arView
+
+            displayLink?.invalidate()
+            let link = CADisplayLink(target: self, selector: #selector(updateFocusedTarget))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
+
+        @objc private func updateFocusedTarget() {
+            guard let arView, !arView.bounds.isEmpty else { return }
+
+            let center = CGPoint(x: arView.bounds.midX, y: arView.bounds.midY)
+            let target = arView.hitTest(center)
+                .compactMap { focusTarget(for: $0.entity) }
+                .first ?? .none
+
+            if focusedTarget.wrappedValue != target {
+                focusedTarget.wrappedValue = target
+            }
+        }
+
+        private func focusTarget(for entity: Entity) -> ARFocusTarget? {
+            var current: Entity? = entity
+
+            while let entity = current {
+                switch entity.name {
+                case ARFocusTarget.ariadne.rawValue:
+                    return .ariadne
+                case ARFocusTarget.poseidon.rawValue:
+                    return .poseidon
+                case ARFocusTarget.puzzlePiece.rawValue:
+                    return .puzzlePiece
+                default:
+                    current = entity.parent
+                }
+            }
+
+            return nil
+        }
+
+        private func tagEntity(_ entity: Entity, as target: ARFocusTarget) {
+            entity.name = target.rawValue
+
+            for child in entity.children {
+                tagEntity(child, as: target)
+            }
+        }
+
+        private func addFocusHitbox(
+            to entity: Entity,
+            as target: ARFocusTarget,
+            size: SIMD3<Float>,
+            centerY: Float
+        ) {
+            let hitbox = Entity()
+            hitbox.name = target.rawValue
+            hitbox.position = SIMD3<Float>(0, centerY, 0)
+            hitbox.components.set(
+                CollisionComponent(shapes: [.generateBox(size: size)])
+            )
+            entity.addChild(hitbox)
+        }
 
         func clearSceneCache() {
             currentStep = nil
@@ -139,8 +209,9 @@ struct ARViewContainer: UIViewRepresentable {
             activeTransientSceneKey = nil
             transientAnchor = nil
             persistentPoseidonAnchor = nil
-            persistentPoseidonPosition = nil
+            persistentAriadneAnchor = nil
             missionMarkerTransform = nil
+            focusedTarget.wrappedValue = .none
         }
 
         func showScene(for step: ARStoryStep, forceRefresh: Bool = false) {
@@ -191,27 +262,6 @@ struct ARViewContainer: UIViewRepresentable {
             handleMissionMarkerAnchors(anchors)
         }
 
-        // Called every frame — measures how far the player (camera) is from
-        // Poseidon so ContentView can show a "Tap to interact" prompt up close.
-        func session(_ session: ARSession, didUpdate frame: ARFrame) {
-            guard let poseidonPosition = persistentPoseidonPosition else {
-                setPlayerNearPoseidon(false)
-                return
-            }
-            let cam = frame.camera.transform.columns.3
-            let cameraPosition = SIMD3<Float>(cam.x, cam.y, cam.z)
-            let distance = simd_distance(cameraPosition, poseidonPosition)
-            setPlayerNearPoseidon(distance < interactionDistance)
-        }
-
-        private func setPlayerNearPoseidon(_ near: Bool) {
-            guard near != isPlayerNearPoseidon else { return }
-            isPlayerNearPoseidon = near
-            DispatchQueue.main.async { [weak self] in
-                self?.onNearPoseidonChanged?(near)
-            }
-        }
-
         private func handleMissionMarkerAnchors(_ anchors: [ARAnchor]) {
             guard let imageAnchor = anchors
                 .compactMap({ $0 as? ARImageAnchor })
@@ -247,6 +297,15 @@ struct ARViewContainer: UIViewRepresentable {
                 return
             }
 
+            if step.model == .ariadne {
+                // Ariadne should stay in the world after she gives the hints.
+                // Keep her on a separate persistent anchor so later puzzle-piece
+                // scenes do not remove her.
+                removeTransientAnchor()
+                ensureAriadneExistsAtMissionMarker(in: arView)
+                return
+            }
+
             if !forceRefresh, nextSceneKey == activeTransientSceneKey, transientAnchor != nil {
                 return
             }
@@ -271,7 +330,18 @@ struct ARViewContainer: UIViewRepresentable {
             anchor.addChild(entity)
             arView.scene.addAnchor(anchor)
             persistentPoseidonAnchor = anchor
-            persistentPoseidonPosition = anchor.position(relativeTo: nil)
+        }
+
+        private func ensureAriadneExistsAtMissionMarker(in arView: ARView) {
+            guard persistentAriadneAnchor == nil else { return }
+
+            let entity = makeMarkerGatedEntity(for: .ariadne)
+            let anchor = AnchorEntity(
+                world: markerGroundedTransformFacingCamera(arView: arView)
+            )
+            anchor.addChild(entity)
+            arView.scene.addAnchor(anchor)
+            persistentAriadneAnchor = anchor
         }
 
         private func removeTransientAnchor() {
@@ -323,10 +393,6 @@ struct ARViewContainer: UIViewRepresentable {
                 return nil
             case .ariadne:
                 return "ariadne"
-            case .headsetDiagramOne:
-                return "headsetDiagram"
-            case .lionFountain:
-                return "lionFountain"
             case .puzzlePiece:
                 return "puzzlePiece"
             case .puzzleSet:
@@ -513,16 +579,12 @@ struct ARViewContainer: UIViewRepresentable {
             switch model {
             case .none:
                 return Entity()
-            case .headsetDiagramOne:
-                return makeHeadsetDiagram()
             case .ariadne:
                 return makeAriadne()
             case .poseidonFar:
                 return makePoseidon(isFar: true)
             case .poseidonClose:
                 return makePoseidon(isFar: false)
-            case .lionFountain:
-                return makeLionFountain()
             case .puzzlePiece:
                 return makePuzzlePiece()
             case .puzzleSet:
@@ -538,7 +600,12 @@ struct ARViewContainer: UIViewRepresentable {
                 return ariadne
             case .puzzlePiece:
                 let puzzlePiece = makePuzzlePiece()
-                puzzlePiece.position = SIMD3<Float>(0, 0.35, 0)
+                puzzlePiece.position = SIMD3<Float>(0, 0.45, 0)
+                // Stand the flat puzzle piece upright when it appears from the scanned marker.
+                puzzlePiece.orientation = simd_quatf(
+                    angle: .pi / 2,
+                    axis: SIMD3<Float>(1, 0, 0)
+                )
                 return puzzlePiece
             default:
                 return makeEntity(for: model)
@@ -552,6 +619,13 @@ struct ARViewContainer: UIViewRepresentable {
                     ? SIMD3<Float>(0.9, 0.9, 0.9)
                     : SIMD3<Float>(1.0, 1.0, 1.0)
                 poseidon.position = SIMD3<Float>(0, 0, 0)
+                tagEntity(poseidon, as: .poseidon)
+                addFocusHitbox(
+                    to: poseidon,
+                    as: .poseidon,
+                    size: SIMD3<Float>(0.9, 1.8, 0.6),
+                    centerY: 0.9
+                )
                 poseidon.generateCollisionShapes(recursive: true)
                 return poseidon
             } catch {
@@ -586,40 +660,14 @@ struct ARViewContainer: UIViewRepresentable {
             group.addChild(exclamation)
             group.scale = isFar ? SIMD3<Float>(0.9, 0.9, 0.9) : SIMD3<Float>(1, 1, 1)
             group.position = SIMD3<Float>(0, 0, 0)
-
-            return group
-        }
-
-        private func makeHeadsetDiagram() -> Entity {
-            let group = Entity()
-
-            let headset = ModelEntity(
-                mesh: .generateBox(width: 0.45, height: 0.2, depth: 0.12),
-                materials: [SimpleMaterial(color: .darkGray, roughness: 0.4, isMetallic: false)]
+            tagEntity(group, as: .poseidon)
+            addFocusHitbox(
+                to: group,
+                as: .poseidon,
+                size: SIMD3<Float>(0.55, 1.0, 0.45),
+                centerY: 0.5
             )
-
-            let button = ModelEntity(
-                mesh: .generateSphere(radius: 0.045),
-                materials: [SimpleMaterial(color: .systemYellow, roughness: 0.3, isMetallic: false)]
-            )
-            button.position = SIMD3<Float>(0.28, 0.03, 0)
-
-            let leftSpeaker = ModelEntity(
-                mesh: .generateSphere(radius: 0.04),
-                materials: [SimpleMaterial(color: .systemBlue, roughness: 0.3, isMetallic: false)]
-            )
-            leftSpeaker.position = SIMD3<Float>(-0.24, -0.02, 0)
-
-            let rightSpeaker = ModelEntity(
-                mesh: .generateSphere(radius: 0.04),
-                materials: [SimpleMaterial(color: .systemBlue, roughness: 0.3, isMetallic: false)]
-            )
-            rightSpeaker.position = SIMD3<Float>(0.16, -0.02, 0)
-
-            group.addChild(headset)
-            group.addChild(button)
-            group.addChild(leftSpeaker)
-            group.addChild(rightSpeaker)
+            group.generateCollisionShapes(recursive: true)
 
             return group
         }
@@ -630,6 +678,13 @@ struct ARViewContainer: UIViewRepresentable {
                 ariadne.scale = SIMD3<Float>(0.85, 0.85, 0.85)
                 ariadne.position = SIMD3<Float>(0, 0, 0)
                 ariadne.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
+                tagEntity(ariadne, as: .ariadne)
+                addFocusHitbox(
+                    to: ariadne,
+                    as: .ariadne,
+                    size: SIMD3<Float>(0.8, 1.6, 0.55),
+                    centerY: 0.8
+                )
                 ariadne.generateCollisionShapes(recursive: true)
                 return ariadne
             } catch {
@@ -663,36 +718,15 @@ struct ARViewContainer: UIViewRepresentable {
             group.addChild(head)
             group.addChild(guideMarker)
             group.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
-
-            return group
-        }
-
-        private func makeLionFountain() -> Entity {
-            let group = Entity()
-
-            let fountain = ModelEntity(
-                mesh: .generateBox(width: 0.35, height: 0.08, depth: 0.35),
-                materials: [SimpleMaterial(color: .systemGray, roughness: 0.5, isMetallic: false)]
+            tagEntity(group, as: .ariadne)
+            addFocusHitbox(
+                to: group,
+                as: .ariadne,
+                size: SIMD3<Float>(0.45, 0.9, 0.4),
+                centerY: 0.45
             )
-            group.addChild(fountain)
+            group.generateCollisionShapes(recursive: true)
 
-            let positions: [SIMD3<Float>] = [
-                SIMD3<Float>(-0.28, 0.08, -0.28),
-                SIMD3<Float>(0.28, 0.08, -0.28),
-                SIMD3<Float>(-0.28, 0.08, 0.28),
-                SIMD3<Float>(0.28, 0.08, 0.28)
-            ]
-
-            for position in positions {
-                let lion = ModelEntity(
-                    mesh: .generateBox(width: 0.12, height: 0.12, depth: 0.18),
-                    materials: [SimpleMaterial(color: .lightGray, roughness: 0.5, isMetallic: false)]
-                )
-                lion.position = position
-                group.addChild(lion)
-            }
-
-            group.position = SIMD3<Float>(0, -0.25, 0)
             return group
         }
 
@@ -734,6 +768,14 @@ struct ARViewContainer: UIViewRepresentable {
 
             root.position = SIMD3<Float>(0, -0.1, 0)
             root.scale = SIMD3<Float>(2.2, 2.2, 2.2)
+            tagEntity(root, as: .puzzlePiece)
+            addFocusHitbox(
+                to: root,
+                as: .puzzlePiece,
+                size: SIMD3<Float>(0.35, 0.35, 0.2),
+                centerY: 0.08
+            )
+            root.generateCollisionShapes(recursive: true)
 
             return root
         }

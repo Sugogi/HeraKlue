@@ -2,13 +2,18 @@ import Foundation
 
 enum ARModelType: Equatable {
     case none
-    case headsetDiagramOne
     case ariadne
     case poseidonFar
     case poseidonClose
-    case lionFountain
     case puzzlePiece
     case puzzleSet
+}
+
+enum ARFocusTarget: String, Equatable {
+    case none
+    case ariadne
+    case poseidon
+    case puzzlePiece
 }
 
 enum OnboardingScreen: Equatable {
@@ -29,6 +34,7 @@ struct ARStoryStep: Identifiable, Equatable {
     let model: ARModelType
     let showsCrosshair: Bool
     let repeatLine: String?
+    var textFocusTarget: ARFocusTarget? = nil
     var onboarding: OnboardingScreen? = nil   // if set, show the Figma 2D screen instead of AR + dialogs
 
     /// Every story step now advances only by user tap.
@@ -119,13 +125,14 @@ struct ARStoryStep: Identifiable, Equatable {
 
         ARStoryStep(
             id: "welcome_1_1",
-            title: "Welcome",
+            title: "Ariadne",
             bodyText: "Welcome, young explorer! I am Ariadne, and I am your guide for this journey.",
             missionText: nil,
             promptText: "Press the button to continue",
             model: .ariadne,
-            showsCrosshair: false,
-            repeatLine: "Welcome, young explorer! I am Ariadne, and I am your guide for this journey."
+            showsCrosshair: true,
+            repeatLine: "Welcome, young explorer! I am Ariadne, and I am your guide for this journey.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -135,8 +142,9 @@ struct ARStoryStep: Identifiable, Equatable {
             missionText: nil,
             promptText: "Press the button to continue",
             model: .ariadne,
-            showsCrosshair: false,
-            repeatLine: "The Minotaur has vanished from the city, and the gods are here to help us find him."
+            showsCrosshair: true,
+            repeatLine: "The Minotaur has vanished from the city, and the gods are here to help us find him.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -146,8 +154,9 @@ struct ARStoryStep: Identifiable, Equatable {
             missionText: nil,
             promptText: "Press the button to continue",
             model: .ariadne,
-            showsCrosshair: false,
-            repeatLine: "As gods, we cannot interfere directly in the mortal world, so we need your help."
+            showsCrosshair: true,
+            repeatLine: "As gods, we cannot interfere directly in the mortal world, so we need your help.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -157,8 +166,9 @@ struct ARStoryStep: Identifiable, Equatable {
             missionText: nil,
             promptText: "Press the button to continue",
             model: .ariadne,
-            showsCrosshair: false,
-            repeatLine: "Collect all 25 puzzle pieces around the city to reveal the map and find the Minotaur."
+            showsCrosshair: true,
+            repeatLine: "Collect all 25 puzzle pieces around the city to reveal the map and find the Minotaur.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -168,19 +178,9 @@ struct ARStoryStep: Identifiable, Equatable {
             missionText: nil,
             promptText: "Press the button to continue",
             model: .ariadne,
-            showsCrosshair: false,
-            repeatLine: "These puzzle pieces will reveal a map that leads to the Minotaur’s secret location."
-        ),
-
-        ARStoryStep(
-            id: "welcome_button_features",
-            title: "Button Tutorial",
-            bodyText: "Press the headset button to continue, select, or interact. Hold the button to repeat a message or notify your parent.",
-            missionText: nil,
-            promptText: "Press the button to continue",
-            model: .headsetDiagramOne,
-            showsCrosshair: false,
-            repeatLine: "Press the headset button to continue, select, or interact. Hold the button to repeat a message or notify your parent."
+            showsCrosshair: true,
+            repeatLine: "These puzzle pieces will reveal a map that leads to the Minotaur’s secret location.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -191,7 +191,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Hold the button to repeat Ariadne’s message",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Walk around the city and approach any quest you like. Gods to meet and puzzle pieces to collect are scattered everywhere — there is no set order."
+            repeatLine: "Walk around the city and approach any quest you like. Gods to meet and puzzle pieces to collect are scattered everywhere — there is no set order.",
+            textFocusTarget: .ariadne
         ),
 
         ARStoryStep(
@@ -202,7 +203,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to begin",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Good luck, adventurer."
+            repeatLine: "Good luck, adventurer.",
+            textFocusTarget: .ariadne
         ),
 
         // MARK: Poseidon Encounter
@@ -215,7 +217,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to move closer",
             model: .poseidonFar,
             showsCrosshair: true,
-            repeatLine: nil
+            repeatLine: nil,
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -226,7 +229,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to approach Poseidon",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "Yoohoo! Come here! Over here!"
+            repeatLine: "Yoohoo! Come here! Over here!",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -237,7 +241,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to accept Poseidon’s mission",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "I am Poseidon. I have a mission for you."
+            repeatLine: "I am Poseidon. I have a mission for you.",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -248,7 +253,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to continue",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "Whatsup, I’m Poseidon, and I’m here to help you, man."
+            repeatLine: "Whatsup, I’m Poseidon, and I’m here to help you, man.",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -259,7 +265,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to continue",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "I can’t say much, but to find your first puzzle piece..."
+            repeatLine: "I can’t say much, but to find your first puzzle piece...",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -270,7 +277,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to continue",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "You have to find the four stone lions in the heart of the city."
+            repeatLine: "You have to find the four stone lions in the heart of the city.",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -281,7 +289,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to accept mission",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "You have to find the four stone lions in the heart of the city."
+            repeatLine: "You have to find the four stone lions in the heart of the city.",
+            textFocusTarget: .poseidon
         ),
 
         // MARK: Mission Accepted
@@ -294,7 +303,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Hold the button to repeat Poseidon’s hint",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "Find the four stone lions in the heart of the city."
+            repeatLine: "Find the four stone lions in the heart of the city.",
+            textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
@@ -327,7 +337,7 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "You are near the lion fountain. Look around carefully.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button when ready",
-            model: .lionFountain,
+            model: .none,
             showsCrosshair: true,
             repeatLine: "Look around the lion fountain carefully."
         ),
@@ -338,7 +348,7 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "You have been searching for a while. Help is available.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to ask for help",
-            model: .lionFountain,
+            model: .none,
             showsCrosshair: true,
             repeatLine: "Look carefully around the lion fountain."
         ),
@@ -373,7 +383,8 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Scan the marker to follow Ariadne",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Psst... over here!"
+            repeatLine: "Psst... over here!",
+            textFocusTarget: .ariadne
         ),
 
         // MARK: Puzzle Interaction
