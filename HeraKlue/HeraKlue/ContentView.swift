@@ -19,11 +19,11 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            ARViewContainer(
-                currentStep: currentStep,
-                resetAR: $resetAR
-            )
-            .ignoresSafeArea()
+            // TEST-MIX: show the physically-placed Poseidon (CombinedARView)
+            // behind the story UI. Not story-synced yet — swap back to
+            // ARViewContainer(currentStep:resetAR:) to restore per-step models.
+            CombinedARView()
+                .ignoresSafeArea()
 
             if let onboarding = currentStep.onboarding {
                 // Early steps show the Figma 2D screens over the camera.

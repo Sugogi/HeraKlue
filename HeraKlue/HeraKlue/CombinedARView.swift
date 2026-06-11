@@ -37,25 +37,24 @@ struct CombinedARView: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
 
-        // Load the printed marker images we want to recognise (from Assets).
-        guard let referenceImages = ARReferenceImage.referenceImages(
-            inGroupNamed: "AR Resources",
-            bundle: nil
-        ) else {
-            print("Could not load AR Resources.")
-            return arView
-        }
-
         let configuration = ARWorldTrackingConfiguration()
 
         // Floor detection for Poseidon
         configuration.planeDetection = [.horizontal]
-
-        // Image tracking for puzzle piece
-        configuration.detectionImages = referenceImages
-        configuration.maximumNumberOfTrackedImages = 1
-
         configuration.environmentTexturing = .automatic
+
+        // Image tracking is OPTIONAL — only on if the "AR Resources" group
+        // exists. This way Poseidon still shows even before you add a marker.
+        let referenceImages = ARReferenceImage.referenceImages(
+            inGroupNamed: "AR Resources",
+            bundle: nil
+        )
+        if let referenceImages {
+            configuration.detectionImages = referenceImages
+            configuration.maximumNumberOfTrackedImages = 1
+        } else {
+            print("No 'AR Resources' image group yet — image tracking off (Poseidon still shows).")
+        }
 
         arView.session.run(configuration, options: [
             .resetTracking,
@@ -86,20 +85,22 @@ struct CombinedARView: UIViewRepresentable {
             print("Failed to load Poseidon model: \(error)")
         }
 
-        // MARK: - Puzzle piece on reference image
+        // MARK: - Puzzle piece on reference image (only if a marker group exists)
 
-        let imageAnchor = AnchorEntity(
-            .image(
-                group: "AR Resources",
-                name: "PoseidonMarker"
+        if referenceImages != nil {
+            let imageAnchor = AnchorEntity(
+                .image(
+                    group: "AR Resources",
+                    name: "PoseidonMarker"
+                )
             )
-        )
 
-        let puzzlePiece = makePuzzlePiece()
-        puzzlePiece.position = [0, 0.02, 0]
+            let puzzlePiece = makePuzzlePiece()
+            puzzlePiece.position = [0, 0.02, 0]
 
-        imageAnchor.addChild(puzzlePiece)
-        arView.scene.addAnchor(imageAnchor)
+            imageAnchor.addChild(puzzlePiece)
+            arView.scene.addAnchor(imageAnchor)
+        }
 
         return arView
     }
