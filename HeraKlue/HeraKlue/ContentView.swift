@@ -88,12 +88,7 @@ struct ContentView: View {
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
-            Text(currentStep.promptText)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(accentBlue, in: Capsule())
+            ButtonHint(text: currentStep.promptText)
                 .padding(.top, 4)
         }
         .padding(20)

@@ -3,9 +3,9 @@
 //  HeraKlue
 //
 //  The Figma-designed 2D onboarding screens, shown over the AR camera during
-//  the early steps (headset intro, loading, consent). Advancing is handled by
-//  ContentView's global tap, so these are purely visual. A step opts in via
-//  ARStoryStep.onboarding.
+//  the early steps. Advancing is handled by ContentView's global tap (the
+//  headset's physical button), so these are purely visual — no on-screen
+//  buttons. "Press the button" appears as a quiet ButtonHint, not a pill.
 //
 
 import SwiftUI
@@ -23,13 +23,13 @@ struct OnboardingScreenView: View {
             StatusOnboarding(
                 message: "HeraKlue needs your parent’s approval before the myth hunt begins.",
                 messageSize: 20,
-                pill: "Please wait..."
+                footer: .waiting
             )
         case .journeyArranged:
             StatusOnboarding(
                 message: "Your Journey has been arranged!",
                 messageSize: 36,
-                pill: "Press the button on your headset to continue"
+                footer: .hint("Press the button to continue")
             )
         }
     }
@@ -52,20 +52,6 @@ private struct CalloutLabel: View {
     }
 }
 
-private struct ContinuePill: View {
-    var body: some View {
-        Text("Press the button to continue")
-            .font(.system(size: 20, weight: .medium, design: .rounded))
-            .foregroundStyle(.black)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 16)
-            .frame(maxWidth: 230)
-            .background(Color(hex: 0x6EBCEF, opacity: 0.82), in: RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .white.opacity(0.7), radius: 14)
-    }
-}
-
 // MARK: - Headset screens (501:7, 501:8)
 
 private struct HeadsetButtonSpeakersScreen: View {
@@ -81,9 +67,9 @@ private struct HeadsetButtonSpeakersScreen: View {
             .overlay(alignment: .topTrailing) { CalloutLabel(text: "Button", size: 24).offset(x: 78, y: 4) }
             .overlay(alignment: .bottomLeading) { CalloutLabel(text: "Speakers", size: 20).offset(x: -36, y: 14) }
 
-            ContinuePill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(24)
+            ButtonHint(text: "Press the button to continue")
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 30)
         }
     }
 }
@@ -100,18 +86,18 @@ private struct HeadsetCameraScreen: View {
             .frame(width: 300, height: 320)
             .overlay(alignment: .bottomLeading) { CalloutLabel(text: "Camera", size: 24).offset(x: -34, y: 6) }
 
-            ContinuePill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(24)
-
-            Text("Make sure nothing is blocking your camera")
-                .font(.system(size: 20, weight: .medium, design: .rounded))
-                .foregroundStyle(.black)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.7))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            VStack(spacing: 0) {
+                Spacer()
+                ButtonHint(text: "Press the button to continue")
+                    .padding(.bottom, 14)
+                Text("Make sure nothing is blocking your camera")
+                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .foregroundStyle(.black)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.white.opacity(0.7))
+            }
         }
     }
 }
@@ -156,7 +142,7 @@ private struct PressToContinueOnboarding: View {
 
             VStack(spacing: 24) {
                 Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
-                blueButton
+                ButtonHint(text: "Press the button to continue")
             }
             .padding(40)
 
@@ -167,29 +153,19 @@ private struct PressToContinueOnboarding: View {
                 .padding(.bottom, 24)
         }
     }
-
-    private var blueButton: some View {
-        ZStack {
-            Capsule().fill(Color(hex: 0x4B93C3)).frame(width: 426, height: 42).offset(x: 3, y: -3)
-            Capsule().fill(Color(hex: 0x73B9E7)).frame(width: 426, height: 41)
-            Text("Press The Button to Continue")
-                .font(.system(size: 24, design: .rounded))
-                .tracking(-0.44)
-                .foregroundStyle(.black)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .padding(.horizontal, 16)
-        }
-        .frame(width: 426, height: 45)
-    }
 }
 
 // MARK: - Status screens (213:36, 213:49)
 
 private struct StatusOnboarding: View {
+    enum Footer {
+        case waiting              // a non-interactive "waiting" status
+        case hint(String)         // a physical-button hint
+    }
+
     let message: String
     let messageSize: CGFloat
-    let pill: String
+    let footer: Footer
 
     var body: some View {
         ZStack {
@@ -205,14 +181,17 @@ private struct StatusOnboarding: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 480)
 
-                Text(pill)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 28)
-                    .background(Color(hex: 0x030213, opacity: 0.5), in: RoundedRectangle(cornerRadius: 8))
+                switch footer {
+                case .waiting:
+                    HStack(spacing: 10) {
+                        ProgressView().tint(Color(hex: 0x4A5565))
+                        Text("Waiting for parent approval…")
+                            .font(.system(size: 16, design: .rounded))
+                            .foregroundStyle(Color(hex: 0x4A5565).opacity(0.75))
+                    }
+                case .hint(let text):
+                    ButtonHint(text: text)
+                }
             }
             .padding(40)
         }
