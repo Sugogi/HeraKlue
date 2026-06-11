@@ -61,29 +61,30 @@ struct CombinedARView: UIViewRepresentable {
             .removeExistingAnchors
         ])
 
-        // MARK: - Poseidon on floor
+        // MARK: - Poseidon, placed ~1.5 m in front of you so it's visible
+        // IMMEDIATELY (no need to find the floor first while we're testing).
 
-        let floorAnchor = AnchorEntity(
-            .plane(
-                .horizontal,
-                classification: .any,
-                minimumBounds: [0.25, 0.25]
-            )
-        )
+        let anchor = AnchorEntity(world: [0, -0.4, -1.5])   // in front, a bit low
 
         do {
             let poseidon = try Entity.load(named: "Poseidon_Stylized")
-
-            // Make Poseidon bigger or smaller here
-            poseidon.scale = [2.0, 2.0, 2.0]
-            poseidon.position = [0, 0, 0]
-
-            floorAnchor.addChild(poseidon)
-            arView.scene.addAnchor(floorAnchor)
-
+            poseidon.scale = [1.0, 1.0, 1.0]   // bump up/down if too small/large
+            anchor.addChild(poseidon)
+            print("✅ Poseidon_Stylized loaded.")
         } catch {
-            print("Failed to load Poseidon model: \(error)")
+            // Fallback so you can tell AR itself is working even if the model
+            // didn't load. If you see a RED CUBE floating in front of you, the
+            // model failed to load — re-export Poseidon as .usdz and make sure
+            // its Target Membership = HeraKlue is checked.
+            print("❌ Could not load Poseidon_Stylized: \(error)")
+            let placeholder = ModelEntity(
+                mesh: .generateBox(size: 0.3),
+                materials: [SimpleMaterial(color: .red, isMetallic: false)]
+            )
+            anchor.addChild(placeholder)
         }
+
+        arView.scene.addAnchor(anchor)
 
         // MARK: - Puzzle piece on reference image (only if a marker group exists)
 
