@@ -33,6 +33,19 @@ struct ARStoryStep: Identifiable, Equatable {
     let repeatLine: String?
     var onboarding: OnboardingScreen? = nil   // if set, show the Figma 2D screen instead of AR + dialogs
 
+    // Auto-advance / tap rules (to reduce tapping; keyed by step id).
+    /// If set, the step advances on its own after this many seconds.
+    var autoAdvance: TimeInterval? {
+        if id == "parental_consent_1_1" { return 5 }                     // waiting for parent
+        if id.hasPrefix("welcome_") && id != "welcome_1_7" { return 5 }  // Ariadne's timed sequence
+        return nil
+    }
+
+    /// If false, pressing the button / tapping does not advance this step.
+    var allowsTap: Bool {
+        id != "parental_consent_1_1"   // the parent-approval wait can't be skipped
+    }
+
     static let steps: [ARStoryStep] = [
 
         // MARK: Headset Instructions

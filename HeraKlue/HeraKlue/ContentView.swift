@@ -45,7 +45,14 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            goToNextScene()
+            if currentStep.allowsTap { goToNextScene() }
+        }
+        .task(id: currentStep.id) {
+            // Timed auto-advance for steps that opt in (waiting screen,
+            // Ariadne's welcome sequence). Restarts whenever the step changes.
+            guard let delay = currentStep.autoAdvance else { return }
+            try? await Task.sleep(for: .seconds(delay))
+            if !Task.isCancelled { goToNextScene() }
         }
         .onLongPressGesture(minimumDuration: 1.0) {
             repeatCurrentLine()
@@ -88,8 +95,10 @@ struct ContentView: View {
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
-            ButtonHint(text: currentStep.promptText)
-                .padding(.top, 4)
+            if currentStep.autoAdvance == nil {
+                ButtonHint(text: currentStep.promptText)
+                    .padding(.top, 4)
+            }
         }
         .padding(20)
         .frame(maxWidth: .infinity)
