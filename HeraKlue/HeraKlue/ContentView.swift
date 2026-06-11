@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var lastSpokenStepID: String? = nil
     @State private var audio = AudioController()
     @State private var pendingAdvance: Task<Void, Never>? = nil
+    @State private var hintAvailable = true
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -49,19 +50,26 @@ struct ContentView: View {
                     CrosshairView(accentBlue: accentBlue)
                 }
 
-                VStack(spacing: 12) {
-                    missionHUD
-                    Spacer()
+                ZStack(alignment: .trailing) {
+                    VStack(spacing: 12) {
+                        missionHUD
+                        Spacer()
 
-                    if isDialogueStep {
-                        if shouldShowDialogueCard {
-                            dialogueCard
+                        if isDialogueStep {
+                            if shouldShowDialogueCard {
+                                dialogueCard
+                            }
+                        } else {
+                            missionPromptCard
                         }
-                    } else {
-                        missionPromptCard
+                    }
+                    .padding()
+
+                    if showsHintButton {
+                        hintButton
+                            .padding(.trailing, 12)
                     }
                 }
-                .padding()
             }
         }
         .contentShape(Rectangle())
@@ -149,6 +157,39 @@ struct ContentView: View {
         }
 
         return focusedTargetDistance <= poseidonDialogueRange
+    }
+
+    private var showsHintButton: Bool {
+        !isDialogueStep && currentStep.missionText != nil && hintAvailable
+    }
+
+    private var hintButton: some View {
+        Button {
+            triggerAriadneHint()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 20))
+                Text("tap twice\nfor a hint")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(.white)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 10)
+            .background(accentBlue.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+        }
+    }
+
+    private func triggerAriadneHint() {
+        hintAvailable = false
+        if let idx = ARStoryStep.steps.firstIndex(where: { $0.id == "journey_1_3" }) {
+            pendingAdvance?.cancel()
+            pendingAdvance = nil
+            currentIndex = idx
+        }
     }
 
     private var shouldShowMissionObjectiveCard: Bool {

@@ -317,17 +317,6 @@ struct ARStoryStep: Identifiable, Equatable {
         ),
 
         ARStoryStep(
-            id: "journey_1_2",
-            title: "Need Help?",
-            bodyText: "You have been searching for a while. Help is available.",
-            missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Press the button to ask for help",
-            model: .none,
-            showsCrosshair: true,
-            repeatLine: "Look carefully around the Four Stone Lions."
-        ),
-
-        ARStoryStep(
             id: "journey_1_3",
             title: "Help Accepted",
             bodyText: "Find Ariadne. She will guide you.",
