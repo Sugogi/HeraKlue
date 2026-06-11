@@ -287,7 +287,7 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "poseidon_speaks_2_4",
             title: "Accept Mission?",
-            bodyText: "Poseidon offers you your first mission. You can accept the mission or walk away.",
+            bodyText: "Poseidon offers you a mission. You can accept it or walk away and find another quest.",
             missionText: "Accept Poseidon’s mission",
             promptText: "Press the button to accept mission",
             model: .poseidonClose,
