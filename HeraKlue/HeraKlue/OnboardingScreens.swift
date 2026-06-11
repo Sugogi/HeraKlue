@@ -3,9 +3,10 @@
 //  HeraKlue
 //
 //  The Figma-designed 2D onboarding screens, shown over the AR camera during
-//  the early steps. Advancing is handled by ContentView's global tap (the
-//  headset's physical button), so these are purely visual — no on-screen
-//  buttons. "Press the button" appears as a quiet ButtonHint, not a pill.
+//  the early steps. No full-screen white film — instead the content (logo,
+//  loading text, messages) sits inside small solid-white cards sized to fit,
+//  so it stays readable over the live camera. Advancing is handled by
+//  ContentView's global tap.
 //
 
 import SwiftUI
@@ -35,7 +36,26 @@ struct OnboardingScreenView: View {
     }
 }
 
-// MARK: - Shared pieces
+// MARK: - Reusable white backings (sized to content, not full-screen)
+
+private extension View {
+    /// A solid-white rounded card behind a block of content.
+    func onboardingCard(padding: CGFloat = 28) -> some View {
+        self
+            .padding(padding)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 24))
+            .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
+    }
+
+    /// A small white pill behind a single line (hints, the camera banner).
+    func whiteChip() -> some View {
+        self
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(Color.white, in: Capsule())
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+    }
+}
 
 private struct CalloutLabel: View {
     let text: String
@@ -68,6 +88,7 @@ private struct HeadsetButtonSpeakersScreen: View {
             .overlay(alignment: .bottomLeading) { CalloutLabel(text: "Speakers", size: 20).offset(x: -36, y: 14) }
 
             ButtonHint(text: "Press the button to continue")
+                .whiteChip()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 30)
         }
@@ -86,18 +107,17 @@ private struct HeadsetCameraScreen: View {
             .frame(width: 300, height: 320)
             .overlay(alignment: .bottomLeading) { CalloutLabel(text: "Camera", size: 24).offset(x: -34, y: 6) }
 
-            VStack(spacing: 0) {
+            VStack(spacing: 12) {
                 Spacer()
-                ButtonHint(text: "Press the button to continue")
-                    .padding(.bottom, 14)
                 Text("Make sure nothing is blocking your camera")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
                     .foregroundStyle(.black)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 24)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .whiteChip()
+                ButtonHint(text: "Press the button to continue")
+                    .whiteChip()
             }
+            .padding(.bottom, 26)
         }
     }
 }
@@ -111,23 +131,19 @@ private struct LoadingOnboarding: View {
         ZStack {
             Color.clear.ignoresSafeArea()
 
-            VStack(spacing: 28) {
-                Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
-                    .shadow(color: .black.opacity(0.3), radius: 10)
+            VStack(spacing: 22) {
+                Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 340)
 
-                VStack(spacing: 14) {
-                    Text("Loading your adventure...")
-                        .font(.system(size: 18)).tracking(-0.44).foregroundStyle(.black)
-                        .shadow(color: .white.opacity(0.85), radius: 5)
+                Text("Loading your adventure...")
+                    .font(.system(size: 18)).tracking(-0.44).foregroundStyle(.black)
 
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color(hex: 0x030213, opacity: 0.2)).frame(width: 256, height: 12)
-                        Capsule().fill(Color(hex: 0x4A5565)).frame(width: 256 * progress, height: 12)
-                    }
-                    .frame(width: 256, height: 12)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color(hex: 0x030213, opacity: 0.2)).frame(width: 256, height: 12)
+                    Capsule().fill(Color(hex: 0x4A5565)).frame(width: 256 * progress, height: 12)
                 }
+                .frame(width: 256, height: 12)
             }
-            .padding(40)
+            .onboardingCard()
         }
         .task {
             withAnimation(.easeInOut(duration: 2.5)) { progress = 1 }
@@ -142,12 +158,11 @@ private struct PressToContinueOnboarding: View {
         ZStack {
             Color.clear.ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
-                    .shadow(color: .black.opacity(0.3), radius: 10)
+            VStack(spacing: 20) {
+                Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 340)
                 ButtonHint(text: "Press the button to continue")
             }
-            .padding(40)
+            .onboardingCard()
 
             Image("HeadsetDevice")
                 .resizable().scaledToFit().frame(width: 130)
@@ -174,16 +189,15 @@ private struct StatusOnboarding: View {
         ZStack {
             Color.clear.ignoresSafeArea()
 
-            VStack(spacing: 28) {
+            VStack(spacing: 22) {
                 Text(message)
                     .font(.system(size: messageSize,
                                   weight: messageSize >= 30 ? .semibold : .regular,
                                   design: .rounded))
                     .tracking(-0.44)
                     .foregroundStyle(Color(hex: 0x4A5565))
-                    .shadow(color: .white.opacity(0.85), radius: 5)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 480)
+                    .frame(maxWidth: 420)
 
                 switch footer {
                 case .waiting:
@@ -197,7 +211,7 @@ private struct StatusOnboarding: View {
                     ButtonHint(text: text)
                 }
             }
-            .padding(40)
+            .onboardingCard()
         }
     }
 }
