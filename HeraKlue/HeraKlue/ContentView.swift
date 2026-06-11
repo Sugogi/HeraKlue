@@ -19,7 +19,7 @@ struct ContentView: View {
     @State private var audio = AudioController()
     @State private var pendingAdvance: Task<Void, Never>? = nil
     @State private var hintAvailable = true
-    @StateObject private var airPods = AirPodsController()
+    @State private var airPods = AirPodsController()
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -411,7 +411,7 @@ private final class AudioController {
     }
 }
 
-private final class AirPodsController: ObservableObject {
+private final class AirPodsController {
     var onSingleTap: (() -> Void)?
     var onDoubleTap: (() -> Void)?
 
