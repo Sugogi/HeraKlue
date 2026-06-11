@@ -2,6 +2,7 @@ import ARKit
 import RealityKit
 import SwiftUI
 import UIKit
+import simd
 
 struct ARViewContainer: UIViewRepresentable {
     let currentStep: ARStoryStep
@@ -11,10 +12,6 @@ struct ARViewContainer: UIViewRepresentable {
         let arView = ARView(frame: .zero)
         context.coordinator.arView = arView
         context.coordinator.hasPoseidonMarker = runSession(on: arView, resetTracking: true)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            context.coordinator.showScene(for: currentStep)
-        }
 
         return arView
     }
@@ -123,24 +120,141 @@ struct ARViewContainer: UIViewRepresentable {
                 return AnchorEntity(.image(group: "AR Resources", name: "PoseidonMarker"))
             }
 
-            return AnchorEntity(world: transformInFrontOfCamera(arView: arView))
+            let distance = spawnDistance(for: model)
+
+            if usesGroundAnchor(for: model) {
+                return AnchorEntity(
+                    world: groundedTransformInFrontOfCamera(
+                        arView: arView,
+                        distance: distance
+                    )
+                )
+            }
+
+            return AnchorEntity(
+                world: transformInFrontOfCamera(
+                    arView: arView,
+                    distance: distance
+                )
+            )
         }
 
-        private func transformInFrontOfCamera(arView: ARView) -> simd_float4x4 {
+        private func usesGroundAnchor(for model: ARModelType) -> Bool {
+            switch model {
+            case .poseidonFar, .poseidonClose, .ariadne:
+                return true
+            default:
+                return false
+            }
+        }
+
+        private func spawnDistance(for model: ARModelType) -> Float {
+            switch model {
+            case .poseidonFar, .poseidonClose:
+                // Spawn Poseidon several meters away so the player has to walk
+                // toward him. Because all Poseidon dialogue steps share the
+                // same stable scene key, this anchor is created once and then
+                // reused instead of jumping to the camera on each line.
+                return -3.2
+            case .ariadne:
+                return -1.4
+            default:
+                return -1.2
+            }
+        }
+
+        private func transformInFrontOfCamera(arView: ARView, distance: Float) -> simd_float4x4 {
             guard let cameraTransform = arView.session.currentFrame?.camera.transform else {
                 var fallback = matrix_identity_float4x4
-                fallback.columns.3.z = -1.2
+                fallback.columns.3.z = distance
                 return fallback
             }
 
             var transform = cameraTransform
-            let distance: Float = -1.2
 
             transform.columns.3.x += cameraTransform.columns.2.x * distance
             transform.columns.3.y += cameraTransform.columns.2.y * distance
             transform.columns.3.z += cameraTransform.columns.2.z * distance
 
             return transform
+        }
+
+        private func groundedTransformInFrontOfCamera(arView: ARView, distance: Float) -> simd_float4x4 {
+            guard let cameraTransform = arView.session.currentFrame?.camera.transform else {
+                var fallback = matrix_identity_float4x4
+                fallback.columns.3.z = distance
+                fallback.columns.3.y = 0
+                return fallback
+            }
+
+            let cameraPosition = SIMD3<Float>(
+                cameraTransform.columns.3.x,
+                cameraTransform.columns.3.y,
+                cameraTransform.columns.3.z
+            )
+
+            // Use only the user's horizontal facing direction. This keeps the
+            // character upright on the floor instead of inheriting camera pitch.
+            let cameraRight = horizontalUnitVector(
+                from: SIMD3<Float>(
+                    cameraTransform.columns.0.x,
+                    cameraTransform.columns.0.y,
+                    cameraTransform.columns.0.z
+                ),
+                fallback: SIMD3<Float>(1, 0, 0)
+            )
+
+            let cameraBackward = horizontalUnitVector(
+                from: SIMD3<Float>(
+                    cameraTransform.columns.2.x,
+                    cameraTransform.columns.2.y,
+                    cameraTransform.columns.2.z
+                ),
+                fallback: SIMD3<Float>(0, 0, 1)
+            )
+
+            var spawnPosition = cameraPosition + cameraBackward * distance
+            spawnPosition.y = detectedGroundY(in: arView) ?? cameraPosition.y - 1.45
+
+            var transform = matrix_identity_float4x4
+            transform.columns.0 = SIMD4<Float>(cameraRight.x, 0, cameraRight.z, 0)
+            transform.columns.1 = SIMD4<Float>(0, 1, 0, 0)
+            transform.columns.2 = SIMD4<Float>(cameraBackward.x, 0, cameraBackward.z, 0)
+            transform.columns.3 = SIMD4<Float>(spawnPosition.x, spawnPosition.y, spawnPosition.z, 1)
+
+            return transform
+        }
+
+        private func horizontalUnitVector(from vector: SIMD3<Float>, fallback: SIMD3<Float>) -> SIMD3<Float> {
+            let horizontal = SIMD3<Float>(vector.x, 0, vector.z)
+            let length = simd_length(horizontal)
+
+            guard length > 0.0001 else { return fallback }
+            return horizontal / length
+        }
+
+        private func detectedGroundY(in arView: ARView) -> Float? {
+            guard !arView.bounds.isEmpty else { return nil }
+
+            let samplePoints = [
+                CGPoint(x: arView.bounds.midX, y: arView.bounds.midY),
+                CGPoint(x: arView.bounds.midX, y: arView.bounds.height * 0.65),
+                CGPoint(x: arView.bounds.midX, y: arView.bounds.height * 0.8)
+            ]
+
+            for point in samplePoints {
+                let results = arView.raycast(
+                    from: point,
+                    allowing: .estimatedPlane,
+                    alignment: .horizontal
+                )
+
+                if let result = results.first {
+                    return result.worldTransform.columns.3.y
+                }
+            }
+
+            return nil
         }
 
         private func makeEntity(for model: ARModelType) -> Entity {
@@ -168,11 +282,9 @@ struct ARViewContainer: UIViewRepresentable {
             do {
                 let poseidon = try Entity.load(named: "Poseidon_Stylized")
                 poseidon.scale = isFar
-                    ? SIMD3<Float>(0.65, 0.65, 0.65)
+                    ? SIMD3<Float>(0.9, 0.9, 0.9)
                     : SIMD3<Float>(1.0, 1.0, 1.0)
-                poseidon.position = isFar
-                    ? SIMD3<Float>(0, -0.55, -0.35)
-                    : SIMD3<Float>(0, -0.65, 0)
+                poseidon.position = SIMD3<Float>(0, 0, 0)
                 poseidon.generateCollisionShapes(recursive: true)
                 return poseidon
             } catch {
@@ -188,24 +300,25 @@ struct ARViewContainer: UIViewRepresentable {
                 mesh: .generateBox(width: 0.18, height: 0.42, depth: 0.12),
                 materials: [SimpleMaterial(color: .systemBlue, roughness: 0.35, isMetallic: false)]
             )
+            body.position = SIMD3<Float>(0, 0.21, 0)
 
             let head = ModelEntity(
                 mesh: .generateSphere(radius: 0.1),
                 materials: [SimpleMaterial(color: .cyan, roughness: 0.35, isMetallic: false)]
             )
-            head.position = SIMD3<Float>(0, 0.32, 0)
+            head.position = SIMD3<Float>(0, 0.53, 0)
 
             let exclamation = ModelEntity(
                 mesh: .generateSphere(radius: 0.045),
                 materials: [SimpleMaterial(color: .systemYellow, roughness: 0.2, isMetallic: false)]
             )
-            exclamation.position = SIMD3<Float>(0, 0.58, 0)
+            exclamation.position = SIMD3<Float>(0, 0.79, 0)
 
             group.addChild(body)
             group.addChild(head)
             group.addChild(exclamation)
-            group.scale = isFar ? SIMD3<Float>(0.55, 0.55, 0.55) : SIMD3<Float>(1, 1, 1)
-            group.position = isFar ? SIMD3<Float>(0, -0.15, -0.5) : SIMD3<Float>(0, -0.2, 0)
+            group.scale = isFar ? SIMD3<Float>(0.9, 0.9, 0.9) : SIMD3<Float>(1, 1, 1)
+            group.position = SIMD3<Float>(0, 0, 0)
 
             return group
         }
@@ -245,28 +358,44 @@ struct ARViewContainer: UIViewRepresentable {
         }
 
         private func makeAriadne() -> Entity {
+            do {
+                let ariadne = try Entity.load(named: "Ariadne_Stylized")
+                ariadne.scale = SIMD3<Float>(0.85, 0.85, 0.85)
+                ariadne.position = SIMD3<Float>(0, 0, 0)
+                ariadne.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
+                ariadne.generateCollisionShapes(recursive: true)
+                return ariadne
+            } catch {
+                print("Could not load Ariadne_Stylized.usdz: \(error)")
+                return makeAriadnePlaceholder()
+            }
+        }
+
+        private func makeAriadnePlaceholder() -> Entity {
             let group = Entity()
 
             let body = ModelEntity(
                 mesh: .generateBox(width: 0.16, height: 0.36, depth: 0.1),
                 materials: [SimpleMaterial(color: .systemPurple, roughness: 0.35, isMetallic: false)]
             )
+            body.position = SIMD3<Float>(0, 0.18, 0)
 
             let head = ModelEntity(
                 mesh: .generateSphere(radius: 0.09),
                 materials: [SimpleMaterial(color: .magenta, roughness: 0.35, isMetallic: false)]
             )
-            head.position = SIMD3<Float>(0, 0.28, 0)
+            head.position = SIMD3<Float>(0, 0.46, 0)
 
             let guideMarker = ModelEntity(
                 mesh: .generateSphere(radius: 0.04),
                 materials: [SimpleMaterial(color: .systemYellow, roughness: 0.25, isMetallic: false)]
             )
-            guideMarker.position = SIMD3<Float>(0.22, 0.18, 0)
+            guideMarker.position = SIMD3<Float>(0.22, 0.36, 0)
 
             group.addChild(body)
             group.addChild(head)
             group.addChild(guideMarker)
+            group.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
 
             return group
         }

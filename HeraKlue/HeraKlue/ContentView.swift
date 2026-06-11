@@ -44,14 +44,6 @@ struct ContentView: View {
         }
         .task(id: currentStep.id) {
             speech.speak(currentStep.bodyText)
-
-            guard let delay = currentStep.autoAdvance else { return }
-            let nanoseconds = UInt64(delay * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: nanoseconds)
-
-            if !Task.isCancelled {
-                goToNextScene()
-            }
         }
     }
 
@@ -89,10 +81,8 @@ struct ContentView: View {
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
-            if currentStep.autoAdvance == nil {
-                ButtonHint(text: currentStep.promptText)
-                    .padding(.top, 4)
-            }
+            ButtonHint(text: currentStep.promptText)
+                .padding(.top, 4)
         }
         .padding(20)
         .frame(maxWidth: .infinity)
