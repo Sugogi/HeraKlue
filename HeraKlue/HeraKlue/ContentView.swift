@@ -174,21 +174,21 @@ struct ContentView: View {
     private var missionObjectiveCard: some View {
         Group {
             if let mission = currentStep.missionText {
-                VStack(spacing: 6) {
-                    Text("MISSION")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(ink.opacity(0.6))
-
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(accentBlue)
                     Text(mission)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundColor(ink)
-                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
                 }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 20)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 12)
                 .background(card)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -216,77 +216,57 @@ struct ContentView: View {
     private var dialogueInteractionPrompt: some View {
         let prompt = dialoguePromptText
 
-        return HStack(spacing: 8) {
+        return HStack(spacing: 6) {
             Image(systemName: shouldShowDialogueCard ? "checkmark.circle.fill" : "scope")
             Text(prompt)
-                .multilineTextAlignment(.center)
+                .lineLimit(1)
         }
-        .font(.system(size: 15, weight: .semibold, design: .rounded))
+        .font(.system(size: 13, weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
-        .padding(.vertical, 9)
-        .padding(.horizontal, 16)
-        .background(accentBlue.opacity(0.88))
+        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .background(accentBlue.opacity(0.82))
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+        .shadow(color: .black.opacity(0.15), radius: 4, y: 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var dialogueCard: some View {
-        VStack(spacing: 12) {
-            Text(currentStep.title)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundColor(ink)
-                .multilineTextAlignment(.center)
-
-            Text(currentStep.bodyText)
-                .font(.system(size: 18, design: .rounded))
-                .foregroundColor(ink)
-                .multilineTextAlignment(.center)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(card)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+        Text(currentStep.bodyText)
+            .font(.system(size: 15, design: .rounded))
+            .foregroundColor(ink)
+            .multilineTextAlignment(.leading)
+            .lineLimit(3)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(card)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
     }
 
     private var missionPromptCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "location.north.line.fill")
-                    .font(.system(size: 14, weight: .bold))
-
-                Text("OBJECTIVE UPDATE")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-            }
-            .foregroundStyle(accentBlue)
-
-            Text(currentStep.title)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-
+        VStack(alignment: .leading, spacing: 6) {
             Text(currentStep.bodyText)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
                 .multilineTextAlignment(.leading)
+                .lineLimit(3)
 
-            Divider()
-                .background(.white.opacity(0.3))
-
-            ButtonHint(text: currentStep.promptText, color: .white)
+            ButtonHint(text: currentStep.promptText, color: .white.opacity(0.7))
         }
-        .padding(18)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(missionDark)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(accentBlue.opacity(0.55), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(accentBlue.opacity(0.4), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
     }
 
     private func speakerName(for target: ARFocusTarget?) -> String {
