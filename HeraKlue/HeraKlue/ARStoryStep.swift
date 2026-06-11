@@ -196,20 +196,20 @@ struct ARStoryStep: Identifiable, Equatable {
 
         ARStoryStep(
             id: "welcome_1_6",
-            title: "First Mission",
-            bodyText: "Walk around to find your first mission. Poseidon is waiting near the loggia.",
-            missionText: "Find Poseidon near the loggia",
+            title: "Explore the City",
+            bodyText: "Walk around the city and approach any quest you like. Gods to meet and puzzle pieces to collect are scattered everywhere — there is no set order.",
+            missionText: "Explore — approach any quest you find",
             promptText: "Hold the button to repeat Ariadne’s message",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Walk around to find your first mission. Poseidon is waiting near the loggia."
+            repeatLine: "Walk around the city and approach any quest you like. Gods to meet and puzzle pieces to collect are scattered everywhere — there is no set order."
         ),
 
         ARStoryStep(
             id: "welcome_1_7",
             title: "Ariadne",
             bodyText: "Good luck, adventurer.",
-            missionText: "Find Poseidon near the loggia",
+            missionText: "Explore — approach any quest you find",
             promptText: "Press the button to begin",
             model: .ariadne,
             showsCrosshair: true,
@@ -221,8 +221,8 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "poseidon_speaks_1_1",
             title: "Poseidon Nearby",
-            bodyText: "Poseidon appears near the loggia with a glowing exclamation point above his head. Move closer to interact.",
-            missionText: "Approach Poseidon near the loggia",
+            bodyText: "You have approached Poseidon, one of the gods scattered across the city. A glowing exclamation point floats above his head. Move closer to interact.",
+            missionText: "Approach Poseidon",
             promptText: "Press the button to move closer",
             model: .poseidonFar,
             showsCrosshair: true,
@@ -233,7 +233,7 @@ struct ARStoryStep: Identifiable, Equatable {
             id: "poseidon_speaks_1_2",
             title: "Poseidon Calls Out",
             bodyText: "Yoohoo! Come here! Over here!",
-            missionText: "Approach Poseidon near the loggia",
+            missionText: "Approach Poseidon",
             promptText: "Press the button to approach Poseidon",
             model: .poseidonClose,
             showsCrosshair: true,
