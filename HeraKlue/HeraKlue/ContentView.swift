@@ -1,4 +1,5 @@
 import AVFoundation
+import MediaPlayer
 import SwiftUI
 
 // Steps that auto-advance when their audio finishes (if the user hasn't tapped first).
@@ -96,6 +97,9 @@ struct ContentView: View {
             advanceFromAriadneToPoseidonIfReady()
             guard isDialogueStep else { return }
             speakCurrentLineIfVisible()
+        }
+        .onAppear {
+            setupAirPodsControls()
         }
     }
 
@@ -332,6 +336,40 @@ struct ContentView: View {
             currentIndex = 0
             resetAR.toggle()
         }
+    }
+
+    private func setupAirPodsControls() {
+        // Activate audio session so remote commands reach this app.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: .mixWithOthers)
+        try? AVAudioSession.sharedInstance().setActive(true)
+
+        let center = MPRemoteCommandCenter.shared()
+
+        // Single tap → advance to next step.
+        center.togglePlayPauseCommand.isEnabled = true
+        center.togglePlayPauseCommand.addTarget { [self] _ in
+            guard currentStep.allowsTap, canInteractWithCurrentStep else { return .commandFailed }
+            DispatchQueue.main.async { goToNextScene() }
+            return .success
+        }
+
+        // Double tap → trigger Ariadne hint (or repeat audio if hint already used).
+        center.nextTrackCommand.isEnabled = true
+        center.nextTrackCommand.addTarget { [self] _ in
+            DispatchQueue.main.async {
+                if showsHintButton {
+                    triggerAriadneHint()
+                } else {
+                    repeatCurrentLine()
+                }
+            }
+            return .success
+        }
+
+        // Provide minimal now-playing info so the system routes commands here.
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: "HeraKlue"
+        ]
     }
 
     private func advanceFromAriadneToPoseidonIfReady() {
