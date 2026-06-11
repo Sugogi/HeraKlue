@@ -3,9 +3,7 @@ import Foundation
 enum ARModelType: Equatable {
     case none
     case headsetDiagramOne
-    case headsetDiagramTwo
     case ariadne
-    case ariadneGuide
     case poseidonFar
     case poseidonClose
     case lionFountain
@@ -360,7 +358,7 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "Find Ariadne. She will guide you.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to find Ariadne",
-            model: .ariadneGuide,
+            model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Find Ariadne. She will guide you."
         ),
@@ -371,7 +369,7 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "Ariadne guides you through audio. Follow her voice.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to continue following",
-            model: .ariadneGuide,
+            model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Follow my voice. I will guide you."
         ),
@@ -382,7 +380,7 @@ struct ARStoryStep: Identifiable, Equatable {
             bodyText: "Psst... over here!",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to follow Ariadne",
-            model: .ariadneGuide,
+            model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Psst... over here!"
         ),

@@ -1,89 +1,83 @@
-import SwiftUI
 import AVFoundation
+import SwiftUI
 
 struct ContentView: View {
     @State private var currentIndex = 0
     @State private var resetAR = false
-    @State private var spokenText = ""
+    @State private var speech = SpeechController()
 
-    private let speechSynthesizer = AVSpeechSynthesizer()
-
-    // Figma palette — Stephen's structure, the Figma look.
-    private let ink = Color(red: 74 / 255, green: 85 / 255, blue: 101 / 255)         // #4A5565
+    private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
-    private let accentBlue = Color(red: 110 / 255, green: 188 / 255, blue: 239 / 255) // #6EBCEF
+    private let accentBlue = Color(hex: 0x6EBCEF)
 
-    var currentStep: ARStoryStep {
+    private var currentStep: ARStoryStep {
         ARStoryStep.steps[currentIndex]
     }
 
     var body: some View {
         ZStack {
-            // TEST-MIX: show the physically-placed Poseidon (CombinedARView)
-            // behind the story UI. Not story-synced yet — swap back to
-            // ARViewContainer(currentStep:resetAR:) to restore per-step models.
-            CombinedARView()
+            ARViewContainer(currentStep: currentStep, resetAR: $resetAR)
                 .ignoresSafeArea()
 
             if let onboarding = currentStep.onboarding {
-                // Early steps show the Figma 2D screens over the camera.
                 OnboardingScreenView(screen: onboarding)
             } else {
                 if currentStep.showsCrosshair {
-                    CrosshairView()
+                    CrosshairView(accentBlue: accentBlue)
                 }
 
                 VStack {
-                    topMissionView
-
+                    missionCard
                     Spacer()
-
-                    bottomStoryView
+                    storyCard
                 }
                 .padding()
             }
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if currentStep.allowsTap { goToNextScene() }
-        }
-        .task(id: currentStep.id) {
-            // Timed auto-advance for steps that opt in (waiting screen,
-            // Ariadne's welcome sequence). Restarts whenever the step changes.
-            guard let delay = currentStep.autoAdvance else { return }
-            try? await Task.sleep(for: .seconds(delay))
-            if !Task.isCancelled { goToNextScene() }
+            guard currentStep.allowsTap else { return }
+            goToNextScene()
         }
         .onLongPressGesture(minimumDuration: 1.0) {
             repeatCurrentLine()
         }
-        .onAppear {
-            speak(currentStep.bodyText)
-        }
-    }
+        .task(id: currentStep.id) {
+            speech.speak(currentStep.bodyText)
 
-    private var topMissionView: some View {
-        VStack(spacing: 6) {
-            if let mission = currentStep.missionText {
-                Text("MISSION")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(ink.opacity(0.6))
+            guard let delay = currentStep.autoAdvance else { return }
+            let nanoseconds = UInt64(delay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
 
-                Text(mission)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundColor(ink)
-                    .multilineTextAlignment(.center)
+            if !Task.isCancelled {
+                goToNextScene()
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 20)
-        .background(card)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-        .opacity(currentStep.missionText == nil ? 0 : 1)
     }
 
-    private var bottomStoryView: some View {
+    private var missionCard: some View {
+        Group {
+            if let mission = currentStep.missionText {
+                VStack(spacing: 6) {
+                    Text("MISSION")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(ink.opacity(0.6))
+
+                    Text(mission)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(ink)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .background(card)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+            }
+        }
+    }
+
+    private var storyCard: some View {
         VStack(spacing: 12) {
             Text(currentStep.title)
                 .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -114,31 +108,31 @@ struct ContentView: View {
             currentIndex = 0
             resetAR.toggle()
         }
-
-        speak(currentStep.bodyText)
     }
 
     private func repeatCurrentLine() {
-        if let repeatLine = currentStep.repeatLine {
-            speak(repeatLine)
-        } else {
-            speak(currentStep.bodyText)
-        }
+        speech.speak(currentStep.repeatLine ?? currentStep.bodyText)
     }
+}
 
-    private func speak(_ text: String) {
-        speechSynthesizer.stopSpeaking(at: .immediate)
+private final class SpeechController {
+    private let synthesizer = AVSpeechSynthesizer()
+
+    func speak(_ text: String) {
+        synthesizer.stopSpeaking(at: .immediate)
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = 0.48
         utterance.pitchMultiplier = 1.0
         utterance.volume = 1.0
 
-        speechSynthesizer.speak(utterance)
+        synthesizer.speak(utterance)
     }
 }
 
 struct CrosshairView: View {
+    let accentBlue: Color
+
     var body: some View {
         ZStack {
             Circle()
@@ -146,7 +140,7 @@ struct CrosshairView: View {
                 .frame(width: 44, height: 44)
 
             Circle()
-                .fill(Color(red: 110 / 255, green: 188 / 255, blue: 239 / 255)) // #6EBCEF
+                .fill(accentBlue)
                 .frame(width: 8, height: 8)
         }
         .shadow(color: .black.opacity(0.35), radius: 4)
