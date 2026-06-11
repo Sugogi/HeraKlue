@@ -113,10 +113,12 @@ private struct LoadingOnboarding: View {
 
             VStack(spacing: 28) {
                 Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
+                    .shadow(color: .black.opacity(0.3), radius: 10)
 
                 VStack(spacing: 14) {
                     Text("Loading your adventure...")
                         .font(.system(size: 18)).tracking(-0.44).foregroundStyle(.black)
+                        .shadow(color: .white.opacity(0.85), radius: 5)
 
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color(hex: 0x030213, opacity: 0.2)).frame(width: 256, height: 12)
@@ -142,6 +144,7 @@ private struct PressToContinueOnboarding: View {
 
             VStack(spacing: 24) {
                 Image("HeraklueLogo").resizable().scaledToFit().frame(maxWidth: 460)
+                    .shadow(color: .black.opacity(0.3), radius: 10)
                 ButtonHint(text: "Press the button to continue")
             }
             .padding(40)
@@ -178,6 +181,7 @@ private struct StatusOnboarding: View {
                                   design: .rounded))
                     .tracking(-0.44)
                     .foregroundStyle(Color(hex: 0x4A5565))
+                    .shadow(color: .white.opacity(0.85), radius: 5)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 480)
 

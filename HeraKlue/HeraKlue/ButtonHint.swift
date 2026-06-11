@@ -20,5 +20,6 @@ struct ButtonHint: View {
         }
         .font(.system(size: 15, weight: .medium, design: .rounded))
         .foregroundStyle(color.opacity(0.75))
+        .shadow(color: .white.opacity(0.7), radius: 4)
     }
 }
