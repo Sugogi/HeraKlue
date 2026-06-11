@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var audio = AudioController()
     @State private var pendingAdvance: Task<Void, Never>? = nil
     @State private var hintAvailable = true
+    @StateObject private var airPods = AirPodsController()
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -99,7 +100,17 @@ struct ContentView: View {
             speakCurrentLineIfVisible()
         }
         .onAppear {
-            setupAirPodsControls()
+            airPods.onSingleTap = {
+                guard currentStep.allowsTap, canInteractWithCurrentStep else { return }
+                goToNextScene()
+            }
+            airPods.onDoubleTap = {
+                if showsHintButton {
+                    triggerAriadneHint()
+                } else {
+                    repeatCurrentLine()
+                }
+            }
         }
     }
 
@@ -338,40 +349,6 @@ struct ContentView: View {
         }
     }
 
-    private func setupAirPodsControls() {
-        // Activate audio session so remote commands reach this app.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: .mixWithOthers)
-        try? AVAudioSession.sharedInstance().setActive(true)
-
-        let center = MPRemoteCommandCenter.shared()
-
-        // Single tap → advance to next step.
-        center.togglePlayPauseCommand.isEnabled = true
-        center.togglePlayPauseCommand.addTarget { [self] _ in
-            guard currentStep.allowsTap, canInteractWithCurrentStep else { return .commandFailed }
-            DispatchQueue.main.async { goToNextScene() }
-            return .success
-        }
-
-        // Double tap → trigger Ariadne hint (or repeat audio if hint already used).
-        center.nextTrackCommand.isEnabled = true
-        center.nextTrackCommand.addTarget { [self] _ in
-            DispatchQueue.main.async {
-                if showsHintButton {
-                    triggerAriadneHint()
-                } else {
-                    repeatCurrentLine()
-                }
-            }
-            return .success
-        }
-
-        // Provide minimal now-playing info so the system routes commands here.
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: "HeraKlue"
-        ]
-    }
-
     private func advanceFromAriadneToPoseidonIfReady() {
         guard isReadyToStartPoseidonDialogue else { return }
         goToNextScene()
@@ -431,6 +408,34 @@ private final class AudioController {
         player = newPlayer
         player?.play()
         return newPlayer.duration
+    }
+}
+
+private final class AirPodsController: ObservableObject {
+    var onSingleTap: (() -> Void)?
+    var onDoubleTap: (() -> Void)?
+
+    init() {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: .mixWithOthers)
+        try? AVAudioSession.sharedInstance().setActive(true)
+
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: "HeraKlue"
+        ]
+
+        let center = MPRemoteCommandCenter.shared()
+
+        center.togglePlayPauseCommand.isEnabled = true
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            DispatchQueue.main.async { self?.onSingleTap?() }
+            return .success
+        }
+
+        center.nextTrackCommand.isEnabled = true
+        center.nextTrackCommand.addTarget { [weak self] _ in
+            DispatchQueue.main.async { self?.onDoubleTap?() }
+            return .success
+        }
     }
 }
 
