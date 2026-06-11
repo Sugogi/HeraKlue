@@ -160,11 +160,11 @@ struct ContentView: View {
     }
 
     private var missionHUD: some View {
-        HStack(alignment: .top) {
+        VStack(spacing: 8) {
             if shouldShowMissionObjectiveCard {
                 missionObjectiveCard
             }
-            Spacer()
+
             if isDialogueStep {
                 dialogueInteractionPrompt
             }
@@ -174,76 +174,119 @@ struct ContentView: View {
     private var missionObjectiveCard: some View {
         Group {
             if let mission = currentStep.missionText {
-                Text(mission)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(ink)
-                    .lineLimit(2)
-                    .padding(.vertical, 7)
-                    .padding(.horizontal, 12)
-                    .background(card)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 4, y: 1)
+                VStack(spacing: 6) {
+                    Text("MISSION")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(ink.opacity(0.6))
+
+                    Text(mission)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(ink)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 20)
+                .background(card)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
             }
         }
     }
 
     private var dialoguePromptText: String {
         if isPoseidonHandoffStep {
-            return focusedTarget == .poseidon ? "Move closer" : "Find Poseidon"
+            if focusedTarget == .poseidon {
+                return "Move closer to Poseidon"
+            }
+
+            return "Walk to Poseidon and aim at him"
         }
-        if shouldShowDialogueCard { return "" }
+
+        if shouldShowDialogueCard {
+            return currentStep.promptText
+        }
+
         if currentStep.textFocusTarget == .poseidon, focusedTarget == .poseidon {
-            return "Move closer"
+            return "Move closer to Poseidon"
         }
-        return "Find \(speakerName(for: currentStep.textFocusTarget))"
+
+        return "Aim the crosshair at \(speakerName(for: currentStep.textFocusTarget))"
     }
 
     private var dialogueInteractionPrompt: some View {
         let prompt = dialoguePromptText
-        return Group {
-            if !prompt.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "scope")
-                    Text(prompt)
-                }
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 12)
-                .background(accentBlue.opacity(0.85))
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.15), radius: 4, y: 1)
-            }
+
+        return HStack(spacing: 8) {
+            Image(systemName: shouldShowDialogueCard ? "checkmark.circle.fill" : "scope")
+            Text(prompt)
+                .multilineTextAlignment(.center)
         }
+        .font(.system(size: 15, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white)
+        .padding(.vertical, 9)
+        .padding(.horizontal, 16)
+        .background(accentBlue.opacity(0.88))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
     }
 
     private var dialogueCard: some View {
-        Text(currentStep.bodyText)
-            .font(.system(size: 15, design: .rounded))
-            .foregroundColor(ink)
-            .multilineTextAlignment(.leading)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(card)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+        VStack(spacing: 12) {
+            Text(currentStep.title)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(ink)
+                .multilineTextAlignment(.center)
+
+            Text(currentStep.bodyText)
+                .font(.system(size: 18, design: .rounded))
+                .foregroundColor(ink)
+                .multilineTextAlignment(.center)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(card)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
     }
 
     private var missionPromptCard: some View {
-        Text(currentStep.bodyText)
-            .font(.system(size: 15, weight: .medium, design: .rounded))
-            .foregroundStyle(.white)
-            .multilineTextAlignment(.leading)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Capsule()
-                    .fill(missionDark)
-                    .overlay(Capsule().stroke(accentBlue.opacity(0.5), lineWidth: 1))
-            )
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "location.north.line.fill")
+                    .font(.system(size: 14, weight: .bold))
+
+                Text("OBJECTIVE UPDATE")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .tracking(1.1)
+            }
+            .foregroundStyle(accentBlue)
+
+            Text(currentStep.title)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+
+            Text(currentStep.bodyText)
+                .font(.system(size: 17, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.9))
+                .multilineTextAlignment(.leading)
+
+            Divider()
+                .background(.white.opacity(0.3))
+
+            ButtonHint(text: currentStep.promptText, color: .white)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(missionDark)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(accentBlue.opacity(0.55), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
     }
 
     private func speakerName(for target: ARFocusTarget?) -> String {
