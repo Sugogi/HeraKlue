@@ -17,8 +17,7 @@ enum ARFocusTarget: String, Equatable {
 }
 
 enum OnboardingScreen: Equatable {
-    case headsetButtonSpeakers   // Figma 501:7
-    case headsetCamera           // Figma 501:8
+    case headsetButtonPopup      // Single headset button intro popup
     case loading                 // Figma 213:12
     case pressToContinue         // Figma 213:21
     case waitingForParent        // Figma 213:36
@@ -46,27 +45,15 @@ struct ARStoryStep: Identifiable, Equatable {
         // MARK: Headset Instructions
 
         ARStoryStep(
-            id: "headset_instructions_1_1",
-            title: "Headset Instructions",
-            bodyText: "Press the headset button to select, continue, or interact. Hold the button to notify your parent. The speakers provide audio guides and enhance the AR experience.",
+            id: "headset_button_popup_1_1",
+            title: "Headset Button",
+            bodyText: "The button is on the side of your headset! Reach up and press it to continue!",
             missionText: nil,
-            promptText: "Press the button to continue",
+            promptText: "Press the headset button to continue",
             model: .none,
             showsCrosshair: false,
             repeatLine: nil,
-            onboarding: .headsetButtonSpeakers
-        ),
-
-        ARStoryStep(
-            id: "headset_instructions_1_2",
-            title: "Headset Camera",
-            bodyText: "The camera identifies what you are looking at so HeraKlue can project relevant images. Do not block the camera.",
-            missionText: nil,
-            promptText: "Press the button to continue",
-            model: .none,
-            showsCrosshair: false,
-            repeatLine: nil,
-            onboarding: .headsetCamera
+            onboarding: .headsetButtonPopup
         ),
 
         // MARK: Loading Screens
@@ -125,7 +112,7 @@ struct ARStoryStep: Identifiable, Equatable {
 
         ARStoryStep(
             id: "welcome_1_1",
-            title: "Ariadne",
+            title: "Welcome",
             bodyText: "Welcome, young explorer! I am Ariadne, and I am your guide for this journey.",
             missionText: nil,
             promptText: "Press the button to continue",
@@ -198,12 +185,12 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "welcome_1_7",
             title: "Ariadne",
-            bodyText: "Good luck, adventurer.",
-            missionText: "Explore — approach any quest you find",
-            promptText: "Press the button to begin",
+            bodyText: "Good luck, adventurer. Poseidon is nearby when you are ready for your first mission.",
+            missionText: "Talk to Poseidon",
+            promptText: "Walk to Poseidon and aim at him",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Good luck, adventurer.",
+            repeatLine: "Good luck, adventurer. Poseidon is nearby when you are ready for your first mission.",
             textFocusTarget: .ariadne
         ),
 
@@ -211,25 +198,25 @@ struct ARStoryStep: Identifiable, Equatable {
 
         ARStoryStep(
             id: "poseidon_speaks_1_1",
-            title: "Poseidon Nearby",
-            bodyText: "You have approached Poseidon, one of the gods scattered across the city. A glowing exclamation point floats above his head. Move closer to interact.",
-            missionText: "Approach Poseidon",
-            promptText: "Press the button to move closer",
+            title: "Poseidon",
+            bodyText: "Yoohoo! Come here! Over here! I have your first mission.",
+            missionText: "Talk to Poseidon",
+            promptText: "Press the button while looking at Poseidon",
             model: .poseidonFar,
             showsCrosshair: true,
-            repeatLine: nil,
+            repeatLine: "Yoohoo! Come here! Over here! I have your first mission.",
             textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
             id: "poseidon_speaks_1_2",
-            title: "Poseidon Calls Out",
-            bodyText: "Yoohoo! Come here! Over here!",
-            missionText: "Approach Poseidon",
-            promptText: "Press the button to approach Poseidon",
+            title: "Poseidon",
+            bodyText: "You found me. Keep your crosshair on me so I can give you the mission.",
+            missionText: "Talk to Poseidon",
+            promptText: "Press the button to continue",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "Yoohoo! Come here! Over here!",
+            repeatLine: "You found me. Keep your crosshair on me so I can give you the mission.",
             textFocusTarget: .poseidon
         ),
 
@@ -303,8 +290,7 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Hold the button to repeat Poseidon’s hint",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "Find the four stone lions in the heart of the city.",
-            textFocusTarget: .poseidon
+            repeatLine: "Find the four stone lions in the heart of the city."
         ),
 
         ARStoryStep(
@@ -333,13 +319,13 @@ struct ARStoryStep: Identifiable, Equatable {
 
         ARStoryStep(
             id: "journey_1_1",
-            title: "Lion Fountain",
-            bodyText: "You are near the lion fountain. Look around carefully.",
+            title: "Four Stone Lions",
+            bodyText: "You are near the Four Stone Lions. Look around carefully.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button when ready",
             model: .none,
             showsCrosshair: true,
-            repeatLine: "Look around the lion fountain carefully."
+            repeatLine: "Look around the Four Stone Lions carefully."
         ),
 
         ARStoryStep(
@@ -350,7 +336,7 @@ struct ARStoryStep: Identifiable, Equatable {
             promptText: "Press the button to ask for help",
             model: .none,
             showsCrosshair: true,
-            repeatLine: "Look carefully around the lion fountain."
+            repeatLine: "Look carefully around the Four Stone Lions."
         ),
 
         ARStoryStep(
