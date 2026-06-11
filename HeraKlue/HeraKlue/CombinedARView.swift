@@ -61,30 +61,36 @@ struct CombinedARView: UIViewRepresentable {
             .removeExistingAnchors
         ])
 
-        // MARK: - Poseidon, placed ~1.5 m in front of you so it's visible
-        // IMMEDIATELY (no need to find the floor first while we're testing).
+        // MARK: - Poseidon, standing on the real floor.
+        // This anchor waits until ARKit detects a horizontal surface (≥0.2 m),
+        // then snaps Poseidon onto it. Aim the camera at the floor and move the
+        // phone a little so ARKit can find the surface.
 
-        let anchor = AnchorEntity(world: [0, -0.4, -1.5])   // in front, a bit low
+        let floorAnchor = AnchorEntity(
+            .plane(.horizontal, classification: .any, minimumBounds: [0.2, 0.2])
+        )
 
         do {
             let poseidon = try Entity.load(named: "Poseidon_Stylized")
             poseidon.scale = [1.0, 1.0, 1.0]   // bump up/down if too small/large
-            anchor.addChild(poseidon)
-            print("✅ Poseidon_Stylized loaded.")
+
+            // Sit his feet on the floor: lift him by however far his lowest
+            // point sits below his origin, so he isn't half-buried.
+            let bounds = poseidon.visualBounds(relativeTo: nil)
+            poseidon.position.y -= bounds.min.y
+
+            floorAnchor.addChild(poseidon)
+            print("✅ Poseidon loaded — point at the floor to place him.")
         } catch {
-            // Fallback so you can tell AR itself is working even if the model
-            // didn't load. If you see a RED CUBE floating in front of you, the
-            // model failed to load — re-export Poseidon as .usdz and make sure
-            // its Target Membership = HeraKlue is checked.
             print("❌ Could not load Poseidon_Stylized: \(error)")
             let placeholder = ModelEntity(
                 mesh: .generateBox(size: 0.3),
                 materials: [SimpleMaterial(color: .red, isMetallic: false)]
             )
-            anchor.addChild(placeholder)
+            floorAnchor.addChild(placeholder)
         }
 
-        arView.scene.addAnchor(anchor)
+        arView.scene.addAnchor(floorAnchor)
 
         // MARK: - Puzzle piece on reference image (only if a marker group exists)
 
