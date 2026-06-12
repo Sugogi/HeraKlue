@@ -20,6 +20,19 @@ struct ARViewContainer: UIViewRepresentable {
         static let physicalWidth: CGFloat = 0.12
     }
 
+    private enum CharacterSpawnConfig {
+        // Poseidon appears when Ariadne's tutorial starts. Increase the
+        // negative distance to put him farther in front of the player.
+        static let poseidonDistanceFromPlayer: Float = -4.8
+
+        // Positive values place Poseidon to the player's right so he is
+        // farther away from Ariadne instead of directly behind her.
+        static let poseidonLateralOffset: Float = 2.1
+
+        // Ariadne tutorial spawn distance from the player.
+        static let ariadneDistanceFromPlayer: Float = -1.4
+    }
+
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         context.coordinator.startFocusTracking(in: arView)
@@ -348,7 +361,7 @@ struct ARViewContainer: UIViewRepresentable {
             let anchor = AnchorEntity(
                 world: markerGroundedTransformFacingCamera(
                     arView: arView,
-                    distanceFromMarker: 2.0
+                    distanceFromMarker: -3.0
                 )
             )
             anchor.addChild(entity)
@@ -462,12 +475,12 @@ struct ARViewContainer: UIViewRepresentable {
         private func spawnDistance(for model: ARModelType) -> Float {
             switch model {
             case .poseidonFar, .poseidonClose:
-                // Spawn Poseidon several meters away so the player has to walk
-                // toward him. Because the Poseidon anchor is persistent, this
-                // is only used the first time Poseidon appears.
-                return -3.2
+                // Poseidon is persistent. This distance is only used the first
+                // time he appears during Ariadne's tutorial. Edit
+                // CharacterSpawnConfig.poseidonDistanceFromPlayer to test.
+                return CharacterSpawnConfig.poseidonDistanceFromPlayer
             case .ariadne:
-                return -1.4
+                return CharacterSpawnConfig.ariadneDistanceFromPlayer
             default:
                 return -1.2
             }
@@ -476,10 +489,10 @@ struct ARViewContainer: UIViewRepresentable {
         private func spawnLateralOffset(for model: ARModelType) -> Float {
             switch model {
             case .poseidonFar, .poseidonClose:
-                // Keep Poseidon visible during Ariadne's tutorial without placing
-                // him directly behind Ariadne's hitbox. Positive values place him
-                // to the user's right at initial spawn.
-                return 1.25
+                // Positive values place Poseidon to the user's right at initial
+                // spawn. Edit CharacterSpawnConfig.poseidonLateralOffset to
+                // increase or decrease his separation from Ariadne.
+                return CharacterSpawnConfig.poseidonLateralOffset
             default:
                 return 0
             }

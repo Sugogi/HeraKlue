@@ -11,9 +11,11 @@ struct ContentView: View {
     @State private var lastSpokenStepID: String? = nil
     @State private var audio = StoryAudioController()
     @State private var headsetButtonController = HeadsetButtonController()
+    @State private var volumeButtonController = VolumeButtonController()
     @State private var ariadneHelpRequested = false
     @State private var showAriadneHelpOffer = false
     @State private var helpOfferDismissed = false
+    @State private var lastAriadneAssistantAudioTime = Date.distantPast
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -30,6 +32,13 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            // Keeps iOS volume-button events available for the Betron wired-earbud fallback.
+            // The view is invisible and does not block touches.
+            SystemVolumeControlView()
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .allowsHitTesting(false)
+
             ARViewContainer(
                 currentStep: currentStep,
                 resetAR: $resetAR,
@@ -56,6 +65,8 @@ struct ContentView: View {
 
                     if isDialogueStep, shouldShowDialogueCard {
                         dialogueCard
+                    } else if shouldShowAriadneAssistantCard {
+                        ariadneAssistantCard
                     } else if shouldShowCompactActionPrompt {
                         compactActionPrompt
                     }
@@ -70,27 +81,37 @@ struct ContentView: View {
         .onLongPressGesture(minimumDuration: 1.0) {
             repeatCurrentLine()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .heraklueHeadsetButtonPressed)) { _ in
+            handlePrimaryTap()
+        }
         .onAppear {
             headsetButtonController.start {
+                handlePrimaryTap()
+            }
+            volumeButtonController.start {
                 handlePrimaryTap()
             }
         }
         .onDisappear {
             headsetButtonController.stop()
+            volumeButtonController.stop()
         }
         .task(id: currentStep.id) {
             playCurrentAudioIfAllowed()
+            playAriadneAssistantHelpIfNeeded()
         }
         .task(id: isMissionStartedStep) {
             await scheduleAriadneHelpOfferIfNeeded()
         }
         .onChange(of: focusedTarget) { _ in
             advanceFromAriadneToPoseidonIfReady()
+            playAriadneAssistantHelpIfNeeded()
             guard isDialogueStep else { return }
             playCurrentAudioIfAllowed()
         }
         .onChange(of: focusedTargetDistance) { _ in
             advanceFromAriadneToPoseidonIfReady()
+            playAriadneAssistantHelpIfNeeded()
             guard isDialogueStep else { return }
             playCurrentAudioIfAllowed()
         }
@@ -106,6 +127,12 @@ struct ContentView: View {
         }
 
         return isCloseEnoughForCurrentDialogue
+    }
+
+    private var shouldShowAriadneAssistantCard: Bool {
+        guard focusedTarget == .ariadne else { return false }
+        guard currentStep.textFocusTarget != .ariadne else { return false }
+        return isMissionStartedStep || currentStep.id.hasPrefix("puzzle_")
     }
 
     private var canInteractWithCurrentStep: Bool {
@@ -223,6 +250,24 @@ struct ContentView: View {
         .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
     }
 
+    private var ariadneAssistantCard: some View {
+        VStack(spacing: 8) {
+            Text("Ariadne")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundColor(ink)
+
+            Text("Psst... over here. Look above me for the puzzle piece.")
+                .font(.system(size: 13, design: .rounded))
+                .foregroundColor(ink)
+                .multilineTextAlignment(.center)
+        }
+        .padding(12)
+        .frame(maxWidth: 300)
+        .background(card)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.12), radius: 7, y: 3)
+    }
+
     private var shouldShowCompactActionPrompt: Bool {
         requiresPuzzleCrosshairToCollect && focusedTarget == .puzzlePiece
     }
@@ -295,7 +340,6 @@ struct ContentView: View {
             "journey_1_2",
             "journey_1_3",
             "journey_1_4",
-            "journey_1_5",
             "puzzle_1_1",
             "puzzle_1_3",
             "puzzle_1_4"
@@ -356,6 +400,19 @@ struct ContentView: View {
         lastSpokenStepID = currentStep.id
     }
 
+    private func playAriadneAssistantHelpIfNeeded() {
+        guard shouldShowAriadneAssistantCard else { return }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastAriadneAssistantAudioTime) > 2.0 else { return }
+
+        lastAriadneAssistantAudioTime = now
+        audio.play(
+            fileName: "13 pssst..over here.mp3",
+            fallbackText: "Psst... over here. Look above me for the puzzle piece."
+        )
+    }
+
     private func repeatCurrentLine() {
         if isDialogueStep {
             guard shouldShowDialogueCard else { return }
@@ -368,8 +425,26 @@ struct ContentView: View {
     }
 }
 
-private final class HeadsetButtonController {
+
+private final class VolumeButtonController {
+    private enum Config {
+        // The volume buttons are not exposed by iOS as normal app buttons.
+        // This fallback observes the system volume value and treats a volume-up
+        // change as the same action as tapping the screen.
+        // Betron 3-button wired earbuds usually expose the center button as a
+        // play/pause remote command. If iOS does not deliver that command, the
+        // + and - buttons still change system volume. For the prototype, either
+        // volume direction can also advance the scene.
+        static let triggerOnVolumeUp = true
+        static let triggerOnVolumeDown = true
+        static let minimumDelta: Float = 0.01
+        static let debounceInterval: TimeInterval = 0.35
+    }
+
+    private var observation: NSKeyValueObservation?
     private var primaryAction: (() -> Void)?
+    private var lastVolume: Float = AVAudioSession.sharedInstance().outputVolume
+    private var lastTriggerDate = Date.distantPast
     private var isRunning = false
 
     func start(action: @escaping () -> Void) {
@@ -379,9 +454,75 @@ private final class HeadsetButtonController {
         isRunning = true
 
         configureAudioSession()
+        lastVolume = AVAudioSession.sharedInstance().outputVolume
+
+        observation = AVAudioSession.sharedInstance().observe(
+            \.outputVolume,
+             options: [.new]
+        ) { [weak self] _, change in
+            guard let newVolume = change.newValue else { return }
+            self?.handleVolumeChange(newVolume)
+        }
+    }
+
+    func stop() {
+        observation?.invalidate()
+        observation = nil
+        primaryAction = nil
+        isRunning = false
+    }
+
+    private func handleVolumeChange(_ newVolume: Float) {
+        let delta = newVolume - lastVolume
+        lastVolume = newVolume
+
+        guard abs(delta) >= Config.minimumDelta else { return }
+
+        let isVolumeUp = delta > 0
+        let shouldTrigger = (isVolumeUp && Config.triggerOnVolumeUp)
+            || (!isVolumeUp && Config.triggerOnVolumeDown)
+
+        guard shouldTrigger else { return }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastTriggerDate) >= Config.debounceInterval else { return }
+        lastTriggerDate = now
+
+        DispatchQueue.main.async { [weak self] in
+            self?.primaryAction?()
+        }
+    }
+
+    private func configureAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+            )
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Volume button observer audio session setup failed: \(error)")
+        }
+    }
+}
+
+private final class HeadsetButtonController {
+    private var primaryAction: (() -> Void)?
+    private var isRunning = false
+    private var silentKeepAlivePlayer: AVAudioPlayer?
+
+    func start(action: @escaping () -> Void) {
+        primaryAction = action
+
+        guard !isRunning else { return }
+        isRunning = true
+
+        configureAudioSession()
+        startSilentKeepAliveAudio()
         UIApplication.shared.beginReceivingRemoteControlEvents()
         configureRemoteCommands()
-        publishNowPlayingInfo()
+        publishNowPlayingInfo(isPlaying: true)
     }
 
     func stop() {
@@ -390,6 +531,12 @@ private final class HeadsetButtonController {
         commandCenter.pauseCommand.removeTarget(nil)
         commandCenter.togglePlayPauseCommand.removeTarget(nil)
         commandCenter.nextTrackCommand.removeTarget(nil)
+        commandCenter.previousTrackCommand.removeTarget(nil)
+        commandCenter.stopCommand.removeTarget(nil)
+
+        silentKeepAlivePlayer?.stop()
+        silentKeepAlivePlayer = nil
+
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         UIApplication.shared.endReceivingRemoteControlEvents()
         isRunning = false
@@ -398,10 +545,24 @@ private final class HeadsetButtonController {
     private func configureRemoteCommands() {
         let commandCenter = MPRemoteCommandCenter.shared()
 
+        // Remove old targets first so repeated app foregrounding does not stack
+        // duplicate handlers and accidentally advance more than one scene.
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        commandCenter.nextTrackCommand.removeTarget(nil)
+        commandCenter.previousTrackCommand.removeTarget(nil)
+        commandCenter.stopCommand.removeTarget(nil)
+
+        // The center button on most 3-button wired earbuds maps to play/pause
+        // or togglePlayPause. The volume up/down buttons are controlled by iOS
+        // system volume and are not available as normal app controls.
         commandCenter.playCommand.isEnabled = true
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.nextTrackCommand.isEnabled = true
+        commandCenter.previousTrackCommand.isEnabled = true
+        commandCenter.stopCommand.isEnabled = true
 
         commandCenter.playCommand.addTarget { [weak self] _ in
             self?.triggerPrimaryAction()
@@ -422,20 +583,39 @@ private final class HeadsetButtonController {
             self?.triggerPrimaryAction()
             return .success
         }
+
+        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
+
+        commandCenter.stopCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
     }
 
     private func triggerPrimaryAction() {
         DispatchQueue.main.async { [weak self] in
             self?.primaryAction?()
+            self?.publishNowPlayingInfo(isPlaying: true)
+
+            if self?.silentKeepAlivePlayer?.isPlaying != true {
+                self?.silentKeepAlivePlayer?.play()
+            }
         }
     }
 
     private func configureAudioSession() {
         do {
+            // Wired headset middle buttons are delivered to apps as media remote
+            // play/pause events. Using playAndRecord with Bluetooth/headset options
+            // makes iOS more likely to route those events to HeraKlue while the
+            // AR scene is active.
             try AVAudioSession.sharedInstance().setCategory(
-                .playback,
-                mode: .spokenAudio,
-                options: [.duckOthers]
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
             )
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
@@ -443,13 +623,97 @@ private final class HeadsetButtonController {
         }
     }
 
-    private func publishNowPlayingInfo() {
+    private func startSilentKeepAliveAudio() {
+        do {
+            let url = try makeSilentControlAudioFileIfNeeded()
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.numberOfLoops = -1
+            player.volume = 1.0
+            player.prepareToPlay()
+            player.play()
+            silentKeepAlivePlayer = player
+        } catch {
+            print("Could not start silent headset control audio: \(error)")
+        }
+    }
+
+    private func makeSilentControlAudioFileIfNeeded() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("heraklue_headset_button_keepalive.wav")
+
+        if FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+
+        let sampleRate: UInt32 = 44_100
+        let channels: UInt16 = 1
+        let bitsPerSample: UInt16 = 16
+        let durationSeconds: UInt32 = 1
+        let bytesPerSample = UInt32(bitsPerSample / 8)
+        let dataSize = sampleRate * UInt32(channels) * bytesPerSample * durationSeconds
+        let byteRate = sampleRate * UInt32(channels) * bytesPerSample
+        let blockAlign = channels * (bitsPerSample / 8)
+
+        var data = Data()
+
+        func appendString(_ value: String) {
+            data.append(value.data(using: .ascii)!)
+        }
+
+        func appendUInt16(_ value: UInt16) {
+            var littleEndianValue = value.littleEndian
+            withUnsafeBytes(of: &littleEndianValue) { buffer in
+                data.append(contentsOf: buffer)
+            }
+        }
+
+        func appendUInt32(_ value: UInt32) {
+            var littleEndianValue = value.littleEndian
+            withUnsafeBytes(of: &littleEndianValue) { buffer in
+                data.append(contentsOf: buffer)
+            }
+        }
+
+        appendString("RIFF")
+        appendUInt32(36 + dataSize)
+        appendString("WAVE")
+        appendString("fmt ")
+        appendUInt32(16)
+        appendUInt16(1)
+        appendUInt16(channels)
+        appendUInt32(sampleRate)
+        appendUInt32(byteRate)
+        appendUInt16(blockAlign)
+        appendUInt16(bitsPerSample)
+        appendString("data")
+        appendUInt32(dataSize)
+        data.append(Data(count: Int(dataSize)))
+
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    private func publishNowPlayingInfo(isPlaying: Bool) {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = [
             MPMediaItemPropertyTitle: "HeraKlue",
-            MPMediaItemPropertyArtist: "Adventure Controls",
-            MPNowPlayingInfoPropertyPlaybackRate: 0.0
+            MPMediaItemPropertyArtist: "Headset Button Control",
+            MPMediaItemPropertyPlaybackDuration: 3600,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: 0,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyIsLiveStream: true
         ]
     }
+}
+
+private struct SystemVolumeControlView: UIViewRepresentable {
+    func makeUIView(context: Context) -> MPVolumeView {
+        let view = MPVolumeView(frame: .zero)
+        view.showsRouteButton = false
+        view.showsVolumeSlider = true
+        return view
+    }
+
+    func updateUIView(_ uiView: MPVolumeView, context: Context) { }
 }
 
 private final class StoryAudioController {
