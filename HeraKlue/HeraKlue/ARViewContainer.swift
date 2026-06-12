@@ -7,6 +7,7 @@ import simd
 struct ARViewContainer: UIViewRepresentable {
     let currentStep: ARStoryStep
     @Binding var resetAR: Bool
+    var onNearPoseidonChanged: (Bool) -> Void = { _ in }
 
     private enum MissionMarker {
         static let resourceName = "ar_marker"
@@ -28,6 +29,8 @@ struct ARViewContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ arView: ARView, context: Context) {
+        context.coordinator.onNearPoseidonChanged = onNearPoseidonChanged
+
         if resetAR {
             arView.scene.anchors.removeAll()
             context.coordinator.clearSceneCache()
@@ -118,6 +121,10 @@ struct ARViewContainer: UIViewRepresentable {
     final class Coordinator: NSObject, ARSessionDelegate {
         weak var arView: ARView?
         var hasMissionMarker = false
+        var onNearPoseidonChanged: ((Bool) -> Void)?
+        private var isPlayerNearPoseidon = false
+        private var persistentPoseidonPosition: SIMD3<Float>?
+        private let interactionDistance: Float = 1.5   // metres
 
         private var currentStep: ARStoryStep?
         private var lastStepID: String?
@@ -132,6 +139,7 @@ struct ARViewContainer: UIViewRepresentable {
             activeTransientSceneKey = nil
             transientAnchor = nil
             persistentPoseidonAnchor = nil
+            persistentPoseidonPosition = nil
             missionMarkerTransform = nil
         }
 
@@ -181,6 +189,27 @@ struct ARViewContainer: UIViewRepresentable {
 
         func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
             handleMissionMarkerAnchors(anchors)
+        }
+
+        // Called every frame — measures how far the player (camera) is from
+        // Poseidon so ContentView can show a "Tap to interact" prompt up close.
+        func session(_ session: ARSession, didUpdate frame: ARFrame) {
+            guard let poseidonPosition = persistentPoseidonPosition else {
+                setPlayerNearPoseidon(false)
+                return
+            }
+            let cam = frame.camera.transform.columns.3
+            let cameraPosition = SIMD3<Float>(cam.x, cam.y, cam.z)
+            let distance = simd_distance(cameraPosition, poseidonPosition)
+            setPlayerNearPoseidon(distance < interactionDistance)
+        }
+
+        private func setPlayerNearPoseidon(_ near: Bool) {
+            guard near != isPlayerNearPoseidon else { return }
+            isPlayerNearPoseidon = near
+            DispatchQueue.main.async { [weak self] in
+                self?.onNearPoseidonChanged?(near)
+            }
         }
 
         private func handleMissionMarkerAnchors(_ anchors: [ARAnchor]) {
@@ -242,6 +271,7 @@ struct ARViewContainer: UIViewRepresentable {
             anchor.addChild(entity)
             arView.scene.addAnchor(anchor)
             persistentPoseidonAnchor = anchor
+            persistentPoseidonPosition = anchor.position(relativeTo: nil)
         }
 
         private func removeTransientAnchor() {

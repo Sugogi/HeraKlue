@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var currentIndex = 0
     @State private var resetAR = false
     @State private var speech = SpeechController()
+    @State private var isNearPoseidon = false
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
@@ -16,8 +17,14 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            ARViewContainer(currentStep: currentStep, resetAR: $resetAR)
-                .ignoresSafeArea()
+            ARViewContainer(
+                currentStep: currentStep,
+                resetAR: $resetAR,
+                onNearPoseidonChanged: { near in
+                    withAnimation(.easeInOut(duration: 0.2)) { isNearPoseidon = near }
+                }
+            )
+            .ignoresSafeArea()
 
             if let onboarding = currentStep.onboarding {
                 OnboardingScreenView(screen: onboarding)
@@ -32,6 +39,21 @@ struct ContentView: View {
                     storyCard
                 }
                 .padding()
+
+                // Appears when the player walks within ~1.5 m of Poseidon.
+                // Tapping anywhere still advances the story (the "interact").
+                if isNearPoseidon {
+                    Label("Tap to interact", systemImage: "hand.tap.fill")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .background(accentBlue, in: Capsule())
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 3)
+                        .offset(y: 80)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
         }
         .contentShape(Rectangle())
