@@ -1,13 +1,7 @@
 import AVFoundation
+import MediaPlayer
 import SwiftUI
-
-// Steps that auto-advance when their audio finishes (if the user hasn't tapped first).
-private let autoAdvanceStepIDs: Set<String> = [
-    "welcome_1_1", "welcome_1_2", "welcome_1_3",
-    "welcome_1_4", "welcome_1_5", "welcome_1_7",
-    "poseidon_speaks_1_1", "poseidon_speaks_2_1",
-    "poseidon_speaks_2_2", "poseidon_speaks_2_3"
-]
+import UIKit
 
 struct ContentView: View {
     @State private var currentIndex = 0
@@ -15,13 +9,15 @@ struct ContentView: View {
     @State private var focusedTarget: ARFocusTarget = .none
     @State private var focusedTargetDistance: Float? = nil
     @State private var lastSpokenStepID: String? = nil
-    @State private var audio = AudioController()
-    @State private var pendingAdvance: Task<Void, Never>? = nil
+    @State private var audio = StoryAudioController()
+    @State private var headsetButtonController = HeadsetButtonController()
+    @State private var ariadneHelpRequested = false
+    @State private var showAriadneHelpOffer = false
+    @State private var helpOfferDismissed = false
 
     private let ink = Color(hex: 0x4A5565)
     private let card = Color.white.opacity(0.9)
     private let accentBlue = Color(hex: 0x6EBCEF)
-    private let missionDark = Color.black.opacity(0.68)
     private let poseidonDialogueRange: Float = 2.25
 
     private var currentStep: ARStoryStep {
@@ -51,14 +47,17 @@ struct ContentView: View {
 
                 VStack(spacing: 12) {
                     missionHUD
+
+                    if showAriadneHelpOffer {
+                        compactAriadneHelpOffer
+                    }
+
                     Spacer()
 
-                    if isDialogueStep {
-                        if shouldShowDialogueCard {
-                            dialogueCard
-                        }
-                    } else {
-                        missionPromptCard
+                    if isDialogueStep, shouldShowDialogueCard {
+                        dialogueCard
+                    } else if shouldShowCompactActionPrompt {
+                        compactActionPrompt
                     }
                 }
                 .padding()
@@ -66,28 +65,34 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard currentStep.allowsTap, canInteractWithCurrentStep else { return }
-            goToNextScene()
+            handlePrimaryTap()
         }
         .onLongPressGesture(minimumDuration: 1.0) {
             repeatCurrentLine()
         }
-        .task(id: currentStep.id) {
-            if isDialogueStep {
-                speakCurrentLineIfVisible()
-            } else {
-                audio.play(stepID: currentStep.id)
+        .onAppear {
+            headsetButtonController.start {
+                handlePrimaryTap()
             }
+        }
+        .onDisappear {
+            headsetButtonController.stop()
+        }
+        .task(id: currentStep.id) {
+            playCurrentAudioIfAllowed()
+        }
+        .task(id: isMissionStartedStep) {
+            await scheduleAriadneHelpOfferIfNeeded()
         }
         .onChange(of: focusedTarget) { _ in
             advanceFromAriadneToPoseidonIfReady()
             guard isDialogueStep else { return }
-            speakCurrentLineIfVisible()
+            playCurrentAudioIfAllowed()
         }
         .onChange(of: focusedTargetDistance) { _ in
             advanceFromAriadneToPoseidonIfReady()
             guard isDialogueStep else { return }
-            speakCurrentLineIfVisible()
+            playCurrentAudioIfAllowed()
         }
     }
 
@@ -110,9 +115,15 @@ struct ContentView: View {
             return false
         }
 
+        if requiresPuzzleCrosshairToCollect {
+            return focusedTarget == .puzzlePiece
+        }
+
         guard currentStep.textFocusTarget != nil else {
             // Mission prompts and non dialogue steps are never locked behind
             // the crosshair. Only speaker dialogue requires aiming at the speaker.
+            // The puzzle pickup step is the exception and requires the crosshair
+            // to be centered on the puzzle piece before collection.
             return true
         }
 
@@ -132,11 +143,21 @@ struct ContentView: View {
     }
 
     private var isAcceptMissionStep: Bool {
-        currentStep.id == "poseidon_speaks_2_4"
+        currentStep.id == "poseidon_speaks_2_5"
     }
 
     private var isPoseidonHandoffStep: Bool {
         currentStep.id == "welcome_1_7"
+    }
+
+    private var requiresPuzzleCrosshairToCollect: Bool {
+        currentStep.id == "puzzle_1_2"
+    }
+
+    private var isMissionStartedStep: Bool {
+        currentStep.id.hasPrefix("mission_accepted")
+            || currentStep.id.hasPrefix("journey_")
+            || currentStep.id.hasPrefix("puzzle_")
     }
 
     private var isReadyToStartPoseidonDialogue: Bool {
@@ -164,153 +185,153 @@ struct ContentView: View {
             if shouldShowMissionObjectiveCard {
                 missionObjectiveCard
             }
-
-            if isDialogueStep {
-                dialogueInteractionPrompt
-            }
         }
     }
 
     private var missionObjectiveCard: some View {
         Group {
             if let mission = currentStep.missionText {
-                VStack(spacing: 6) {
-                    Text("MISSION")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundColor(ink.opacity(0.6))
-
-                    Text(mission)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundColor(ink)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 20)
-                .background(card)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                Text(mission)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundColor(ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 12)
+                    .background(card)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
             }
         }
-    }
-
-    private var dialoguePromptText: String {
-        if isPoseidonHandoffStep {
-            if focusedTarget == .poseidon {
-                return "Move closer to Poseidon"
-            }
-
-            return "Walk to Poseidon and aim at him"
-        }
-
-        if shouldShowDialogueCard {
-            return currentStep.promptText
-        }
-
-        if currentStep.textFocusTarget == .poseidon, focusedTarget == .poseidon {
-            return "Move closer to Poseidon"
-        }
-
-        return "Aim the crosshair at \(speakerName(for: currentStep.textFocusTarget))"
-    }
-
-    private var dialogueInteractionPrompt: some View {
-        let prompt = dialoguePromptText
-
-        return HStack(spacing: 8) {
-            Image(systemName: shouldShowDialogueCard ? "checkmark.circle.fill" : "scope")
-            Text(prompt)
-                .multilineTextAlignment(.center)
-        }
-        .font(.system(size: 15, weight: .semibold, design: .rounded))
-        .foregroundStyle(.white)
-        .padding(.vertical, 9)
-        .padding(.horizontal, 16)
-        .background(accentBlue.opacity(0.88))
-        .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
     }
 
     private var dialogueCard: some View {
         VStack(spacing: 12) {
             Text(currentStep.title)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
 
             Text(currentStep.bodyText)
-                .font(.system(size: 18, design: .rounded))
+                .font(.system(size: 14, design: .rounded))
                 .foregroundColor(ink)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
+        .padding(14)
+        .frame(maxWidth: 340)
         .background(card)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
     }
 
-    private var missionPromptCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "location.north.line.fill")
-                    .font(.system(size: 14, weight: .bold))
-
-                Text("OBJECTIVE UPDATE")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-            }
-            .foregroundStyle(accentBlue)
-
-            Text(currentStep.title)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-
-            Text(currentStep.bodyText)
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
-                .multilineTextAlignment(.leading)
-
-            Divider()
-                .background(.white.opacity(0.3))
-
-            ButtonHint(text: currentStep.promptText, color: .white)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(missionDark)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(accentBlue.opacity(0.55), lineWidth: 1)
-                )
-        )
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 5)
+    private var shouldShowCompactActionPrompt: Bool {
+        requiresPuzzleCrosshairToCollect && focusedTarget == .puzzlePiece
     }
 
-    private func speakerName(for target: ARFocusTarget?) -> String {
-        switch target {
-        case .some(.ariadne):
-            return "Ariadne"
-        case .some(.poseidon):
-            return "Poseidon"
-        case .some(.puzzlePiece):
-            return "the puzzle piece"
-        case .some(.none), .none:
-            return "the speaker"
+    private var compactActionPrompt: some View {
+        Text("Collect")
+            .font(.system(size: 14, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 16)
+            .background(accentBlue.opacity(0.92))
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
+    }
+
+    private var compactAriadneHelpOffer: some View {
+        Text("Need help? Press button.")
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 14)
+            .background(Color.black.opacity(0.68))
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+    }
+
+
+    private func handlePrimaryTap() {
+        if showAriadneHelpOffer {
+            requestAriadneHelp()
+            return
         }
+
+        guard currentStep.allowsTap, canInteractWithCurrentStep else { return }
+        goToNextScene()
     }
 
     private func goToNextScene() {
-        pendingAdvance?.cancel()
-        pendingAdvance = nil
         if currentIndex < ARStoryStep.steps.count - 1 {
-            currentIndex += 1
+            var nextIndex = currentIndex + 1
+
+            // The UI is intentionally minimal now, so some older mission/objective
+            // steps would appear blank. Skip those transition-only steps so every
+            // button press lands on something the player can actually see or do.
+            while nextIndex < ARStoryStep.steps.count - 1,
+                  shouldSkipTransitionStep(ARStoryStep.steps[nextIndex]) {
+                nextIndex += 1
+            }
+
+            currentIndex = nextIndex
         } else {
             currentIndex = 0
             resetAR.toggle()
+            ariadneHelpRequested = false
+            showAriadneHelpOffer = false
+            helpOfferDismissed = false
         }
+    }
+
+    private func shouldSkipTransitionStep(_ step: ARStoryStep) -> Bool {
+        transitionOnlyStepIDs.contains(step.id)
+    }
+
+    private var transitionOnlyStepIDs: Set<String> {
+        [
+            "mission_accepted_1_1",
+            "mission_accepted_1_2",
+            "mission_accepted_1_3",
+            "journey_1_1",
+            "journey_1_2",
+            "journey_1_3",
+            "journey_1_4",
+            "journey_1_5",
+            "puzzle_1_1",
+            "puzzle_1_3",
+            "puzzle_1_4"
+        ]
+    }
+
+    @MainActor
+    private func scheduleAriadneHelpOfferIfNeeded() async {
+        guard isMissionStartedStep else {
+            showAriadneHelpOffer = false
+            return
+        }
+
+        guard !ariadneHelpRequested, !helpOfferDismissed else { return }
+
+        showAriadneHelpOffer = false
+        try? await Task.sleep(for: .seconds(45))
+
+        guard !Task.isCancelled,
+              isMissionStartedStep,
+              !ariadneHelpRequested,
+              !helpOfferDismissed
+        else { return }
+
+        showAriadneHelpOffer = true
+    }
+
+    private func requestAriadneHelp() {
+        ariadneHelpRequested = true
+        showAriadneHelpOffer = false
+        helpOfferDismissed = true
+
+        audio.play(
+            fileName: "13 pssst..over here.mp3",
+            fallbackText: "Psst... over here! I will guide you."
+        )
     }
 
     private func advanceFromAriadneToPoseidonIfReady() {
@@ -318,60 +339,174 @@ struct ContentView: View {
         goToNextScene()
     }
 
-    private func speakCurrentLineIfVisible() {
-        guard isDialogueStep, shouldShowDialogueCard else { return }
-        guard lastSpokenStepID != currentStep.id else { return }
-        lastSpokenStepID = currentStep.id
-
-        guard let duration = audio.play(stepID: currentStep.id) else { return }
-
-        guard autoAdvanceStepIDs.contains(currentStep.id) else { return }
-        pendingAdvance?.cancel()
-        pendingAdvance = Task {
-            try? await Task.sleep(for: .seconds(duration))
-            guard !Task.isCancelled else { return }
-            goToNextScene()
+    private func playCurrentAudioIfAllowed() {
+        if isDialogueStep {
+            guard shouldShowDialogueCard else { return }
         }
+
+        // Only auto-play supplied MP3 files, except speaker dialogue can still
+        // fall back to iOS text-to-speech if a matching file is missing.
+        guard currentStep.audioFileName != nil || isDialogueStep else { return }
+        guard lastSpokenStepID != currentStep.id else { return }
+
+        audio.play(
+            fileName: currentStep.audioFileName,
+            fallbackText: currentStep.bodyText
+        )
+        lastSpokenStepID = currentStep.id
     }
 
     private func repeatCurrentLine() {
-        guard isDialogueStep, shouldShowDialogueCard else { return }
-        audio.play(stepID: currentStep.id)
+        if isDialogueStep {
+            guard shouldShowDialogueCard else { return }
+        }
+
+        audio.play(
+            fileName: currentStep.audioFileName,
+            fallbackText: currentStep.repeatLine ?? currentStep.bodyText
+        )
     }
 }
 
-private final class AudioController {
+private final class HeadsetButtonController {
+    private var primaryAction: (() -> Void)?
+    private var isRunning = false
+
+    func start(action: @escaping () -> Void) {
+        primaryAction = action
+
+        guard !isRunning else { return }
+        isRunning = true
+
+        configureAudioSession()
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        configureRemoteCommands()
+        publishNowPlayingInfo()
+    }
+
+    func stop() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.removeTarget(nil)
+        commandCenter.pauseCommand.removeTarget(nil)
+        commandCenter.togglePlayPauseCommand.removeTarget(nil)
+        commandCenter.nextTrackCommand.removeTarget(nil)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        UIApplication.shared.endReceivingRemoteControlEvents()
+        isRunning = false
+    }
+
+    private func configureRemoteCommands() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.isEnabled = true
+        commandCenter.pauseCommand.isEnabled = true
+        commandCenter.togglePlayPauseCommand.isEnabled = true
+        commandCenter.nextTrackCommand.isEnabled = true
+
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
+
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
+
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
+
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            self?.triggerPrimaryAction()
+            return .success
+        }
+    }
+
+    private func triggerPrimaryAction() {
+        DispatchQueue.main.async { [weak self] in
+            self?.primaryAction?()
+        }
+    }
+
+    private func configureAudioSession() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(
+                .playback,
+                mode: .spokenAudio,
+                options: [.duckOthers]
+            )
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Headset button audio session setup failed: \(error)")
+        }
+    }
+
+    private func publishNowPlayingInfo() {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: "HeraKlue",
+            MPMediaItemPropertyArtist: "Adventure Controls",
+            MPNowPlayingInfoPropertyPlaybackRate: 0.0
+        ]
+    }
+}
+
+private final class StoryAudioController {
+    private let synthesizer = AVSpeechSynthesizer()
     private var player: AVAudioPlayer?
 
-    private let stepAudioMap: [String: String] = [
-        "parental_consent_1_2": "1 your journey has been arranged",
-        "welcome_1_1":          "2 Welcome!",
-        "welcome_1_2":          "3 Minotaur vanished",
-        "welcome_1_3":          "4 As gods",
-        "welcome_1_4":          "5 25 puzzle pieces",
-        "welcome_1_5":          "6 secret location",
-        "welcome_1_7":          "7 good luck adventurer",
-        "poseidon_speaks_1_1":  "yoohoo!",
-        "poseidon_speaks_2_1":  "9 Whatsup! im poseidon",
-        "poseidon_speaks_2_2":  "10 i cant say much but",
-        "poseidon_speaks_2_3":  "11 you have to find",
-        "mission_accepted_1_1": "12 The FOUR.STONE.LIONS",
-        "journey_1_5":          "13 pssst..over here",
-        "journey_1_4":          "hey, follow me!",
-        "puzzle_1_2":           "0 press the button to interact",
-    ]
+    func play(fileName: String?, fallbackText: String) {
+        stopCurrentAudio()
 
-    @discardableResult
-    func play(stepID: String) -> TimeInterval? {
-        guard let filename = stepAudioMap[stepID],
-              let url = Bundle.main.url(forResource: filename, withExtension: "mp3"),
-              let newPlayer = try? AVAudioPlayer(contentsOf: url) else {
-            return nil
+        if let fileName, let url = bundledAudioURL(for: fileName) {
+            do {
+                try configureAudioSession()
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.prepareToPlay()
+                player.play()
+                self.player = player
+                return
+            } catch {
+                print("Could not play audio file \(fileName): \(error)")
+            }
+        } else if let fileName {
+            print("Could not find audio file in app bundle: \(fileName)")
         }
+
+        speakFallback(fallbackText)
+    }
+
+    private func stopCurrentAudio() {
         player?.stop()
-        player = newPlayer
-        player?.play()
-        return newPlayer.duration
+        player = nil
+        synthesizer.stopSpeaking(at: .immediate)
+    }
+
+    private func bundledAudioURL(for fileName: String) -> URL? {
+        let nsFileName = fileName as NSString
+        let resourceName = nsFileName.deletingPathExtension
+        let fileExtension = nsFileName.pathExtension.isEmpty ? "mp3" : nsFileName.pathExtension
+
+        return Bundle.main.url(forResource: resourceName, withExtension: fileExtension)
+    }
+
+    private func configureAudioSession() throws {
+        try AVAudioSession.sharedInstance().setCategory(
+            .playback,
+            mode: .spokenAudio,
+            options: [.duckOthers]
+        )
+        try AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    private func speakFallback(_ text: String) {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = 0.48
+        utterance.pitchMultiplier = 1.0
+        utterance.volume = 1.0
+
+        synthesizer.speak(utterance)
     }
 }
 

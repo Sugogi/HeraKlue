@@ -95,18 +95,18 @@ private struct HeadsetButtonPopupScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
             Text("The button is on the side of your headset!\nReach up and press it to continue!")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color(hex: 0x4A5565))
                 .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.vertical, 18)
-                .padding(.horizontal, 22)
+                .lineSpacing(3)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 18)
                 .background(Color.white.opacity(cardOpacity), in: RoundedRectangle(cornerRadius: 22))
                 .shadow(color: .black.opacity(0.22), radius: 12, y: 5)
-                .frame(maxWidth: 390)
+                .frame(maxWidth: 340)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding(.horizontal, 24)
-                .padding(.bottom, 34)
+                .padding(.bottom, 10)
         }
     }
 }

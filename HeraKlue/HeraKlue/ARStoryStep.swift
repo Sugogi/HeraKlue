@@ -33,8 +33,35 @@ struct ARStoryStep: Identifiable, Equatable {
     let model: ARModelType
     let showsCrosshair: Bool
     let repeatLine: String?
-    var textFocusTarget: ARFocusTarget? = nil
-    var onboarding: OnboardingScreen? = nil   // if set, show the Figma 2D screen instead of AR + dialogs
+    let audioFileName: String?
+    var textFocusTarget: ARFocusTarget?
+    var onboarding: OnboardingScreen?   // if set, show the Figma 2D screen instead of AR + dialogs
+
+    init(
+        id: String,
+        title: String,
+        bodyText: String,
+        missionText: String?,
+        promptText: String,
+        model: ARModelType,
+        showsCrosshair: Bool,
+        repeatLine: String?,
+        audioFileName: String? = nil,
+        textFocusTarget: ARFocusTarget? = nil,
+        onboarding: OnboardingScreen? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.bodyText = bodyText
+        self.missionText = missionText
+        self.promptText = promptText
+        self.model = model
+        self.showsCrosshair = showsCrosshair
+        self.repeatLine = repeatLine
+        self.audioFileName = audioFileName
+        self.textFocusTarget = textFocusTarget
+        self.onboarding = onboarding
+    }
 
     /// Every story step now advances only by user tap.
     /// This keeps the app from changing scenes automatically while the user is looking around in AR.
@@ -53,6 +80,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .none,
             showsCrosshair: false,
             repeatLine: nil,
+            audioFileName: "0 press the button to interact.mp3",
             onboarding: .headsetButtonPopup
         ),
 
@@ -105,6 +133,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .none,
             showsCrosshair: false,
             repeatLine: nil,
+            audioFileName: "1 your journey has been arranged.mp3",
             onboarding: .journeyArranged
         ),
 
@@ -119,6 +148,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Welcome, young explorer! I am Ariadne, and I am your guide for this journey.",
+            audioFileName: "2 Welcome!.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -131,6 +161,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "The Minotaur has vanished from the city, and the gods are here to help us find him.",
+            audioFileName: "3 Minotaur vanished.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -143,6 +174,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "As gods, we cannot interfere directly in the mortal world, so we need your help.",
+            audioFileName: "4 As gods.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -155,6 +187,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Collect all 25 puzzle pieces around the city to reveal the map and find the Minotaur.",
+            audioFileName: "5 25 puzzle pieces.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -167,6 +200,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "These puzzle pieces will reveal a map that leads to the Minotaur’s secret location.",
+            audioFileName: "6 secret location.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -191,6 +225,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Good luck, adventurer. Poseidon is nearby when you are ready for your first mission.",
+            audioFileName: "7 good luck adventurer.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -205,6 +240,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .poseidonFar,
             showsCrosshair: true,
             repeatLine: "Yoohoo! Come here! Over here! I have your first mission.",
+            audioFileName: "yoohoo!.mp3",
             textFocusTarget: .poseidon
         ),
 
@@ -221,6 +257,18 @@ struct ARStoryStep: Identifiable, Equatable {
         ),
 
         ARStoryStep(
+            id: "poseidon_speaks_1_3",
+            title: "Poseidon",
+            bodyText: "I am Poseidon. I have a mission for you.",
+            missionText: "Talk to Poseidon",
+            promptText: "Press the button to accept Poseidon’s mission",
+            model: .poseidonClose,
+            showsCrosshair: true,
+            repeatLine: "I am Poseidon. I have a mission for you.",
+            textFocusTarget: .poseidon
+        ),
+
+        ARStoryStep(
             id: "poseidon_speaks_2_1",
             title: "Poseidon",
             bodyText: "Whatsup, I’m Poseidon, and I’m here to help you, man.",
@@ -229,6 +277,7 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .poseidonClose,
             showsCrosshair: true,
             repeatLine: "Whatsup, I’m Poseidon, and I’m here to help you, man.",
+            audioFileName: "9 Whatsup! im poseidon.mp3",
             textFocusTarget: .poseidon
         ),
 
@@ -241,23 +290,38 @@ struct ARStoryStep: Identifiable, Equatable {
             model: .poseidonClose,
             showsCrosshair: true,
             repeatLine: "I can’t say much, but to find your first puzzle piece...",
+            audioFileName: "10 i cant say much but.mp3",
             textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
             id: "poseidon_speaks_2_3",
             title: "Poseidon",
-            bodyText: "You have to find the four stone lions in the heart of the city.",
+            bodyText: "You have to find...",
             missionText: "Talk to Poseidon",
             promptText: "Press the button to continue",
             model: .poseidonClose,
             showsCrosshair: true,
-            repeatLine: "You have to find the four stone lions in the heart of the city.",
+            repeatLine: "You have to find...",
+            audioFileName: "11 you have to find.mp3",
             textFocusTarget: .poseidon
         ),
 
         ARStoryStep(
             id: "poseidon_speaks_2_4",
+            title: "Poseidon",
+            bodyText: "The Four Stone Lions.",
+            missionText: "Talk to Poseidon",
+            promptText: "Press the button to continue",
+            model: .poseidonClose,
+            showsCrosshair: true,
+            repeatLine: "The Four Stone Lions.",
+            audioFileName: "12 The FOUR.STONE.LIONS.mp3",
+            textFocusTarget: .poseidon
+        ),
+
+        ARStoryStep(
+            id: "poseidon_speaks_2_5",
             title: "Accept Mission?",
             bodyText: "Poseidon offers you a mission. You can accept it or walk away and find another quest.",
             missionText: "Accept Poseidon’s mission",
@@ -273,7 +337,7 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "mission_accepted_1_1",
             title: "Mission Started",
-            bodyText: "Using Poseidon’s hint, you must find the puzzle piece.",
+            bodyText: "Using Poseidon’s hint, travel to the Four Stone Lions and scan the reference marker to reveal the puzzle piece.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Hold the button to repeat Poseidon’s hint",
             model: .poseidonClose,
@@ -284,7 +348,7 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "mission_accepted_1_2",
             title: "Mission",
-            bodyText: "Your mission is active.",
+            bodyText: "Your mission is active. The puzzle piece is hidden near the Four Stone Lions marker.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to continue",
             model: .none,
@@ -295,7 +359,7 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "mission_accepted_1_3",
             title: "Begin the Journey",
-            bodyText: "You start moving away from Poseidon. Poseidon fades into the distance.",
+            bodyText: "Travel to the Four Stone Lions. When you find the marker, scan it to reveal Ariadne and the puzzle piece.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button to continue",
             model: .poseidonFar,
@@ -308,7 +372,7 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "journey_1_1",
             title: "Four Stone Lions",
-            bodyText: "You are near the Four Stone Lions. Look around carefully.",
+            bodyText: "You are near the Four Stone Lions. Scan the reference marker to reveal the puzzle piece.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
             promptText: "Press the button when ready",
             model: .none,
@@ -319,9 +383,9 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "journey_1_2",
             title: "Need Help?",
-            bodyText: "You have been searching for a while. Help is available.",
+            bodyText: "If you need help, Ariadne will appear near the scanned marker and guide you to the puzzle piece.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Press the button to ask for help",
+            promptText: "After a short search, press the help prompt to call Ariadne",
             model: .none,
             showsCrosshair: true,
             repeatLine: "Look carefully around the Four Stone Lions."
@@ -330,23 +394,24 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "journey_1_3",
             title: "Help Accepted",
-            bodyText: "Find Ariadne. She will guide you.",
+            bodyText: "Ariadne is on her way. She will appear farther away from the marker near the puzzle piece.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Scan the marker to reveal Ariadne",
+            promptText: "Look around the puzzle location for Ariadne",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Find Ariadne. She will guide you."
+            repeatLine: "Ariadne is on her way. She will appear farther away from the marker near the puzzle piece."
         ),
 
         ARStoryStep(
             id: "journey_1_4",
             title: "Follow Ariadne",
-            bodyText: "Ariadne guides you through audio. Follow her voice.",
+            bodyText: "Ariadne appears farther away from the marker near the puzzle piece. Follow her voice and look where she is guiding you.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Scan the marker to keep following Ariadne",
+            promptText: "Follow Ariadne near the puzzle location",
             model: .ariadne,
             showsCrosshair: true,
-            repeatLine: "Follow my voice. I will guide you."
+            repeatLine: "Follow my voice. I will guide you.",
+            audioFileName: "hey, follow me!.mp3"
         ),
 
         ARStoryStep(
@@ -354,10 +419,11 @@ struct ARStoryStep: Identifiable, Equatable {
             title: "Ariadne Appears",
             bodyText: "Psst... over here!",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Scan the marker to follow Ariadne",
+            promptText: "Aim at Ariadne to hear her hint",
             model: .ariadne,
             showsCrosshair: true,
             repeatLine: "Psst... over here!",
+            audioFileName: "13 pssst..over here.mp3",
             textFocusTarget: .ariadne
         ),
 
@@ -366,9 +432,9 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "puzzle_1_1",
             title: "Puzzle Piece Nearby",
-            bodyText: "Following Ariadne, a floating puzzle piece appears in your view.",
+            bodyText: "A floating puzzle piece appears above Ariadne after the reference marker is scanned.",
             missionText: "Find the puzzle piece near the Four Stone Lions",
-            promptText: "Scan the marker to reveal the puzzle piece",
+            promptText: "Look for Ariadne and the floating puzzle piece",
             model: .puzzlePiece,
             showsCrosshair: true,
             repeatLine: "Center the crosshair on the puzzle piece."
@@ -377,18 +443,19 @@ struct ARStoryStep: Identifiable, Equatable {
         ARStoryStep(
             id: "puzzle_1_2",
             title: "Interact",
-            bodyText: "Center your crosshair on the puzzle piece, then press the headset button to interact.",
+            bodyText: "Center your crosshair on the puzzle piece, then press the headset button to collect it.",
             missionText: "Collect the puzzle piece",
-            promptText: "Press the button to collect the scanned puzzle piece",
+            promptText: "Aim at the puzzle piece, then press the button",
             model: .puzzlePiece,
             showsCrosshair: true,
-            repeatLine: "Center your crosshair on the puzzle piece, then press the button to interact."
+            repeatLine: "Center your crosshair on the puzzle piece, then press the button to collect it.",
+            audioFileName: "0 press the button to interact.mp3"
         ),
 
         ARStoryStep(
             id: "puzzle_1_3",
             title: "Mission Completed",
-            bodyText: "Mission completed. The crosshair is centered on the puzzle piece.",
+            bodyText: "Mission completed. The puzzle piece was collected while the crosshair was centered on it.",
             missionText: "Puzzle piece found",
             promptText: "Press the button to continue",
             model: .puzzlePiece,

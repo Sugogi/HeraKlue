@@ -24,7 +24,7 @@ struct ARViewContainer: UIViewRepresentable {
         let arView = ARView(frame: .zero)
         context.coordinator.startFocusTracking(in: arView)
         arView.session.delegate = context.coordinator
-        context.coordinator.hasMissionMarker = runSession(on: arView, resetTracking: true)
+        runSession(on: arView, resetTracking: true)
 
         return arView
     }
@@ -33,7 +33,7 @@ struct ARViewContainer: UIViewRepresentable {
         if resetAR {
             arView.scene.anchors.removeAll()
             context.coordinator.clearSceneCache()
-            context.coordinator.hasMissionMarker = runSession(on: arView, resetTracking: true)
+            runSession(on: arView, resetTracking: true)
 
             DispatchQueue.main.async {
                 resetAR = false
@@ -47,8 +47,7 @@ struct ARViewContainer: UIViewRepresentable {
         Coordinator(focusedTarget: $focusedTarget, focusedTargetDistance: $focusedTargetDistance)
     }
 
-    @discardableResult
-    private func runSession(on arView: ARView, resetTracking: Bool) -> Bool {
+    private func runSession(on arView: ARView, resetTracking: Bool) {
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal]
         configuration.environmentTexturing = .automatic
@@ -65,7 +64,6 @@ struct ARViewContainer: UIViewRepresentable {
             : []
 
         arView.session.run(configuration, options: options)
-        return !referenceImages.isEmpty
     }
 
     private func makeReferenceImages() -> Set<ARReferenceImage> {
@@ -117,9 +115,9 @@ struct ARViewContainer: UIViewRepresentable {
         return referenceImage
     }
 
+
     final class Coordinator: NSObject, ARSessionDelegate {
         weak var arView: ARView?
-        var hasMissionMarker = false
 
         private var focusedTarget: Binding<ARFocusTarget>
         private var focusedTargetDistance: Binding<Float?>
@@ -130,6 +128,7 @@ struct ARViewContainer: UIViewRepresentable {
         private var transientAnchor: AnchorEntity?
         private var persistentPoseidonAnchor: AnchorEntity?
         private var persistentAriadneAnchor: AnchorEntity?
+        private var missionPuzzlePieceEntity: Entity?
         private var missionMarkerTransform: simd_float4x4?
 
         init(focusedTarget: Binding<ARFocusTarget>, focusedTargetDistance: Binding<Float?>) {
@@ -234,6 +233,7 @@ struct ARViewContainer: UIViewRepresentable {
             transientAnchor = nil
             persistentPoseidonAnchor = nil
             persistentAriadneAnchor = nil
+            missionPuzzlePieceEntity = nil
             missionMarkerTransform = nil
             focusedTarget.wrappedValue = .none
             focusedTargetDistance.wrappedValue = nil
@@ -247,6 +247,8 @@ struct ARViewContainer: UIViewRepresentable {
 
             lastStepID = step.id
 
+            removeCollectedMissionPuzzlePieceIfNeeded(for: step)
+
             if shouldKeepPoseidonVisible(for: step) {
                 // Poseidon is part of the world from the Ariadne tutorial onward.
                 // Spawn him once beside Ariadne and keep the same anchor for the
@@ -255,18 +257,14 @@ struct ARViewContainer: UIViewRepresentable {
             }
 
             if isPoseidon(step.model) {
-                // Poseidon is persistent. During the Poseidon dialogue, keep the
-                // intro Ariadne anchor visible so she does not disappear just
-                // because the player walked over to Poseidon. Once the mission
-                // is accepted, remove that intro Ariadne anchor.
-                if isMissionStarted(step) {
-                    removeTransientAnchor()
-                }
+                // Poseidon is persistent. Once he appears, he is never removed
+                // during normal scene changes.
+                removeTransientAnchor()
                 return
             }
 
             if shouldUseMissionMarker(for: step) {
-                showMarkerGatedScene(for: step, in: arView, forceRefresh: forceRefresh)
+                showMarkerGatedScene(for: step, in: arView)
                 return
             }
 
@@ -321,40 +319,16 @@ struct ARViewContainer: UIViewRepresentable {
             }
         }
 
-        private func showMarkerGatedScene(for step: ARStoryStep, in arView: ARView, forceRefresh: Bool) {
-            let nextSceneKey = missionMarkerSceneKey(for: step.model)
-
+        private func showMarkerGatedScene(for step: ARStoryStep, in arView: ARView) {
             guard missionMarkerTransform != nil else {
-                // The mission has started, but the user has not scanned the marker yet.
-                // Keep Poseidon persistent, but do not spawn Ariadne or the puzzle piece.
                 removeTransientAnchor()
                 return
             }
 
             if step.model == .ariadne || step.model == .puzzlePiece {
-                // Ariadne and the puzzle piece are now a paired marker scene.
-                // Once the mission marker is scanned, Ariadne spawns 1 meter
-                // away from the marker and the puzzle piece appears above her
-                // at the same time. They stay persistent after the hints.
                 removeTransientAnchor()
                 ensureAriadneAndPuzzlePieceExistAtMissionMarker(in: arView)
-                return
             }
-
-            if !forceRefresh, nextSceneKey == activeTransientSceneKey, transientAnchor != nil {
-                return
-            }
-
-            removeTransientAnchor()
-
-            let entity = makeMarkerGatedEntity(for: step.model)
-            let anchor = AnchorEntity(
-                world: markerGroundedTransformFacingCamera(arView: arView)
-            )
-            anchor.addChild(entity)
-            arView.scene.addAnchor(anchor)
-            transientAnchor = anchor
-            activeTransientSceneKey = nextSceneKey
         }
 
         private func ensurePoseidonExists(for model: ARModelType, in arView: ARView) {
@@ -374,12 +348,31 @@ struct ARViewContainer: UIViewRepresentable {
             let anchor = AnchorEntity(
                 world: markerGroundedTransformFacingCamera(
                     arView: arView,
-                    distanceFromMarker: 1.0
+                    distanceFromMarker: 2.0
                 )
             )
             anchor.addChild(entity)
             arView.scene.addAnchor(anchor)
             persistentAriadneAnchor = anchor
+        }
+
+        private func removeCollectedMissionPuzzlePieceIfNeeded(for step: ARStoryStep) {
+            guard isPuzzleCollected(step) else { return }
+
+            missionPuzzlePieceEntity?.removeFromParent()
+            missionPuzzlePieceEntity = nil
+
+            if focusedTarget.wrappedValue == .puzzlePiece {
+                focusedTarget.wrappedValue = .none
+                focusedTargetDistance.wrappedValue = nil
+            }
+        }
+
+        private func isPuzzleCollected(_ step: ARStoryStep) -> Bool {
+            step.id == "puzzle_1_3"
+                || step.id == "puzzle_1_4"
+                || step.id == "puzzle_1_5"
+                || step.id == "puzzle_1_6"
         }
 
         private func removeTransientAnchor() {
@@ -419,17 +412,6 @@ struct ARViewContainer: UIViewRepresentable {
                 return true
             default:
                 return false
-            }
-        }
-
-        private func missionMarkerSceneKey(for model: ARModelType) -> String? {
-            switch model {
-            case .ariadne:
-                return "missionMarkerAriadne"
-            case .puzzlePiece:
-                return "missionMarkerPuzzlePiece"
-            default:
-                return nil
             }
         }
 
@@ -571,6 +553,7 @@ struct ARViewContainer: UIViewRepresentable {
             return transform
         }
 
+
         private func markerGroundedTransformFacingCamera(
             arView: ARView,
             distanceFromMarker: Float = 0
@@ -591,8 +574,8 @@ struct ARViewContainer: UIViewRepresentable {
             } ?? SIMD3<Float>(markerPosition.x, markerPosition.y, markerPosition.z + 1)
 
             // Direction from the marker toward the player/camera. Ariadne uses
-            // this to spawn 1 meter away from the reference marker instead of
-            // directly on top of the printed image.
+            // this to spawn away from the reference marker instead of directly
+            // on top of the printed image.
             let toCamera = horizontalUnitVector(
                 from: cameraPosition - markerPosition,
                 fallback: SIMD3<Float>(0, 0, 1)
@@ -663,26 +646,6 @@ struct ARViewContainer: UIViewRepresentable {
                 return makePuzzlePiece()
             case .puzzleSet:
                 return makePuzzleSet()
-            }
-        }
-
-        private func makeMarkerGatedEntity(for model: ARModelType) -> Entity {
-            switch model {
-            case .ariadne:
-                let ariadne = makeAriadne()
-                ariadne.position = SIMD3<Float>(0, 0, 0)
-                return ariadne
-            case .puzzlePiece:
-                let puzzlePiece = makePuzzlePiece()
-                puzzlePiece.position = SIMD3<Float>(0, 0.45, 0)
-                // Stand the flat puzzle piece upright when it appears from the scanned marker.
-                puzzlePiece.orientation = simd_quatf(
-                    angle: .pi / 2,
-                    axis: SIMD3<Float>(1, 0, 0)
-                )
-                return puzzlePiece
-            default:
-                return makeEntity(for: model)
             }
         }
 
@@ -775,6 +738,7 @@ struct ARViewContainer: UIViewRepresentable {
                 angle: .pi / 2,
                 axis: SIMD3<Float>(1, 0, 0)
             )
+            missionPuzzlePieceEntity = puzzlePiece
             group.addChild(puzzlePiece)
 
             group.generateCollisionShapes(recursive: true)
@@ -907,6 +871,12 @@ struct ARViewContainer: UIViewRepresentable {
             let collectedPiece = makePuzzlePiece()
             collectedPiece.position = SIMD3<Float>(-0.2, 0.08, 0.04)
             collectedPiece.scale = SIMD3<Float>(1.2, 1.2, 1.2)
+            // Rotate the flat puzzle piece so it sits upright on the vertical board
+            // instead of lying sideways/edge-on. The board face is on the X/Y plane.
+            collectedPiece.orientation = simd_quatf(
+                angle: .pi / 2,
+                axis: SIMD3<Float>(1, 0, 0)
+            )
 
             group.addChild(board)
             group.addChild(collectedPiece)
