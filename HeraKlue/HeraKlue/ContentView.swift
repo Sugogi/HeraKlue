@@ -63,8 +63,12 @@ struct ContentView: View {
 
                     Spacer()
 
-                    if isDialogueStep, shouldShowDialogueCard {
-                        dialogueCard
+                    if isDialogueStep {
+                        if shouldShowDialogueCard {
+                            dialogueCard
+                        } else {
+                            aimPrompt
+                        }
                     } else if shouldShowCompactActionPrompt {
                         compactActionPrompt
                     }
@@ -191,6 +195,30 @@ struct ContentView: View {
             .background(card)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+    }
+
+    private var aimPrompt: some View {
+        let name: String
+        switch currentStep.textFocusTarget {
+        case .ariadne: name = "Ariadne"
+        case .poseidon: name = "Poseidon"
+        default: name = "the character"
+        }
+        let text = (currentStep.textFocusTarget == .poseidon && focusedTarget == .poseidon)
+            ? "Move closer to Poseidon"
+            : "Aim at \(name)"
+        return HStack(spacing: 6) {
+            Image(systemName: "scope")
+            Text(text).lineLimit(1)
+        }
+        .font(.system(size: 13, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .background(accentBlue.opacity(0.82))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.15), radius: 4, y: 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var shouldShowCompactActionPrompt: Bool {
