@@ -29,9 +29,22 @@
 		FF2A40FE2FD811D900794906 /* HeraKlueUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HeraKlueUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		050CB1A12FDAF3B10056B919 /* Exceptions for "HeraKlue" folder in "HeraKlue" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = FF2A40E62FD811D700794906 /* HeraKlue */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		FF2A40E92FD811D700794906 /* HeraKlue */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				050CB1A12FDAF3B10056B919 /* Exceptions for "HeraKlue" folder in "HeraKlue" target */,
+			);
 			path = HeraKlue;
 			sourceTree = "<group>";
 		};
@@ -400,6 +413,7 @@
 				DEVELOPMENT_TEAM = HBD9BUHV8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HeraKlue/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "HeraKlue needs your camera for AR capabilities";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -433,6 +447,7 @@
 				DEVELOPMENT_TEAM = HBD9BUHV8Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HeraKlue/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "HeraKlue needs your camera for AR capabilities";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
