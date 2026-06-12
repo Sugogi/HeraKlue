@@ -34,6 +34,12 @@ import UIKit
 
 struct CombinedARView: UIViewRepresentable {
 
+    // === Character placement (metres) on the detected floor. ===
+    // CHANGE THESE to move characters or change the gap between them.
+    // Negative Z = further away from the first floor spot.
+    private let ariadneFloorPosition: SIMD3<Float>  = [0, 0,  0]   // first stop (near)
+    private let poseidonFloorPosition: SIMD3<Float> = [0, 0, -3]   // 3 m further along
+
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
 
@@ -61,34 +67,29 @@ struct CombinedARView: UIViewRepresentable {
             .removeExistingAnchors
         ])
 
-        // MARK: - Poseidon, standing on the real floor.
-        // This anchor waits until ARKit detects a horizontal surface (≥0.2 m),
-        // then snaps Poseidon onto it. Aim the camera at the floor and move the
-        // phone a little so ARKit can find the surface.
+        // MARK: - Ariadne (near) and Poseidon (further) on the real floor.
+        // Both hang off ONE floor anchor, so the distance between them is just
+        // the difference of their positions above. The player meets Ariadne
+        // first, then walks ~3 m to Poseidon. Aim at the floor + move the phone
+        // a little so ARKit can find the surface.
 
         let floorAnchor = AnchorEntity(
             .plane(.horizontal, classification: .any, minimumBounds: [0.2, 0.2])
         )
 
-        do {
-            let poseidon = try Entity.load(named: "Poseidon_Stylized")
-            poseidon.scale = [1.0, 1.0, 1.0]   // bump up/down if too small/large
+        let ariadne = loadCharacter(
+            named: "Ariadne",                  // <- change to match the real .usdz filename
+            at: ariadneFloorPosition,
+            fallbackColor: .systemPurple
+        )
+        floorAnchor.addChild(ariadne)
 
-            // Sit his feet on the floor: lift him by however far his lowest
-            // point sits below his origin, so he isn't half-buried.
-            let bounds = poseidon.visualBounds(relativeTo: nil)
-            poseidon.position.y -= bounds.min.y
-
-            floorAnchor.addChild(poseidon)
-            print("✅ Poseidon loaded — point at the floor to place him.")
-        } catch {
-            print("❌ Could not load Poseidon_Stylized: \(error)")
-            let placeholder = ModelEntity(
-                mesh: .generateBox(size: 0.3),
-                materials: [SimpleMaterial(color: .red, isMetallic: false)]
-            )
-            floorAnchor.addChild(placeholder)
-        }
+        let poseidon = loadCharacter(
+            named: "Poseidon_Stylized",
+            at: poseidonFloorPosition,
+            fallbackColor: .systemBlue
+        )
+        floorAnchor.addChild(poseidon)
 
         arView.scene.addAnchor(floorAnchor)
 
@@ -113,6 +114,29 @@ struct CombinedARView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {}
+
+    /// Loads a character model — or a coloured placeholder box if it can't be
+    /// loaded (e.g. the model isn't in the project yet) — and sits its feet on
+    /// the floor at the given position.
+    private func loadCharacter(named name: String,
+                               at floorPosition: SIMD3<Float>,
+                               fallbackColor: UIColor) -> Entity {
+        let entity: Entity
+        do {
+            entity = try Entity.load(named: name)
+            print("✅ \(name) loaded.")
+        } catch {
+            print("⚠️ Could not load \(name): \(error) — using a placeholder box.")
+            entity = ModelEntity(
+                mesh: .generateBox(size: 0.3),
+                materials: [SimpleMaterial(color: fallbackColor, isMetallic: false)]
+            )
+        }
+        // Lift so the model's lowest point rests on the floor (floorPosition.y).
+        let minY = entity.visualBounds(relativeTo: nil).min.y
+        entity.position = [floorPosition.x, floorPosition.y - minY, floorPosition.z]
+        return entity
+    }
 
     private func makePuzzlePiece() -> Entity {
         let root = Entity()
